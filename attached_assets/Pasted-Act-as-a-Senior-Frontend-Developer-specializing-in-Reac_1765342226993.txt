@@ -1,0 +1,65 @@
+Act as a Senior Frontend Developer specializing in React.js and Tailwind CSS.
+
+I need you to build the frontend architecture and key components for a clinic appointment website named "Cliniga".
+
+IMPORTANT CONSTRAINTS:
+
+    Frontend ONLY: Do NOT write any backend logic, Node.js code, or SQL queries.
+
+    Mock Data: Since there is no backend yet, you must simulate all data fetching using local mock JSON data and simulate authentication using React Context and LocalStorage to store a dummy user token and role.
+
+    Styling: Use Tailwind CSS for a clean, modern, professional medical aesthetic (e.g., trustworthy blues, clean whites). Ensure it is fully responsive.
+
+Project Scope & Features (based on attachment):
+
+The application needs to handle two distinct user roles: 'Patient' and 'Doctor'. The UI must adapt dynamically based on the logged-in role.
+
+Required Pages & Routes Structure:
+
+    Public/Guest Routes:
+
+        / (Landing Page): Welcome message and navigation.
+
+        /login: A form allowing selection of role (Doctor/Patient) for simulated login.
+
+        /register: Basic registration form.
+
+        /doctors: A public list view of doctors showing their name, specialization, and practice schedule (mock data).
+
+    Private/Protected Routes (Require Authentication):
+
+        /dashboard: The main landing page after login. Content varies drastically by role (see below).
+
+Role-Based Logic & Components:
+
+A. If Logged in as PATIENT:
+
+    Navbar: Should show links to "Dashboard", "Book Appointment", and "Logout".
+
+    Dashboard View (/dashboard): Should display a section for "Upcoming Appointments" and another for "Appointment History".
+
+    Booking Feature (/book-appointment): A form/wizard to select a Doctor from a list, pick a date/time, and submit a booking (simulate the submission to console log and update mock state).
+
+B. If Logged in as DOCTOR:
+
+    Navbar: Should show links to "Dashboard (Schedule)" and "Logout".
+
+    Dashboard View (/dashboard): Should display "Today's Appointments" list.
+
+    Appointment Details & Records: When a doctor clicks an appointment in their list, it should open a modal or a details page where they can view patient info and, crucially, add Medical Records (Diagnosis and Notes inputs) for that specific appointment.
+
+Deliverables:
+
+    Project Structure: A suggested folder structure for the React project (e.g., /src/components, /src/pages, /src/context, /src/data).
+
+    Mock Data Sample (/src/data/mockData.js): Provide sample JSON arrays based on the attachment's schema guideline for:
+
+        doctors (id, name, specialization, schedule string)
+
+        appointments (id, patientName, doctorName, date, time, status)
+
+    Core Component Examples: Please write the full React component code + Tailwind classes for:
+
+        The Role-Based Dashboard page component (how you switch between patient view vs doctor view).
+
+        A styled Appointment Card component (used in lists to show appointment info, date, time, and status badge).
