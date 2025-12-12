@@ -9,7 +9,12 @@ requires = [
     'waitress',
     'alembic',
     'bcrypt',
-    'pyramid_debugtoolbar'
+    'python-dotenv'
+]
+
+dev_requires = [
+    'pyramid_debugtoolbar',
+    'pytest'
 ]
 
 setup(
@@ -17,6 +22,9 @@ setup(
     version='0.1',
     packages=find_packages(),
     install_requires=requires,
+    extras_require={
+        'dev' : dev_requires,
+    },
     entry_points={
         'paste.app_factory': [
             'main = src:main',
