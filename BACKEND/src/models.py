@@ -1,56 +1,67 @@
-from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Enum, func
+import psycopg2
+
+#ini bisa dikostumisasi sesuai configurasi database yang antum jalanin
+#ini buat connect ke database postgresql di root/database/a.sql
+conn = psycopg2.connect(
+    host="database-pemweb",
+    port=5432,
+    database="webdb",
+    user="user",
+    password="user123"
 )
-from sqlalchemy.orm import relationship, declarative_base, scoped_session, sessionmaker
-from zope.sqlalchemy import register
-import datetime
 
-# Setup Session
-DBSession = scoped_session(sessionmaker())
-register(DBSession)
-Base = declarative_base()
+cursor = conn.cursor()
 
-# MODEL USER
-class User(Base):
-    __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)
-    email = Column(String(100), unique=True, nullable=False)
-    password = Column(Text, nullable=False) # Akan berisi Hash, bukan password asli
-    role = Column(String(20), nullable=False) # 'patient' atau 'doctor'
-    created_at = Column(DateTime, default=func.now())
+# =========================
+# FUNCTIONS
+# =========================
 
-    # RELASI: Satu User (jika dokter) punya satu Doctor Profile
-    # uselist=False artinya One-to-One
-    doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
+#ini untuk akses seluruh data di tabel users, tanpa filter apapun
+#isinya id, name, email, password, role, created_at
+def fetch_users():
+    cursor.execute("SELECT * FROM users")
+    return cursor.fetchall()
 
-    def to_json(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "role": self.role
-        }
+#ini untuk akses seluruh data di tabel doctors, tanpa filter apapun
+#isinya id, user_id, specialization, schedule, created_at
+def fetch_doctors():
+    cursor.execute("SELECT * FROM doctors")
+    return cursor.fetchall()
 
-# MODEL DOCTOR (Sesuai SQL tabel doctors)
-class Doctor(Base):
-    __tablename__ = 'doctors'
+#ini untuk akses seluruh data di tabel medical_records, tanpa filter apapun
+#isinya id, appointment_id, diagnosis, notes, created_at
+def fetch_medical_records():
+    cursor.execute("SELECT * FROM medical_records")
+    return cursor.fetchall()
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False)
-    specialization = Column(String(100), nullable=False)
-    schedule = Column(Text)
-    created_at = Column(DateTime, default=func.now())
+#ini untuk akses seluruh data di tabel appointments, tanpa filter apapun
+#isinya id, patient_id, doctor_id, appointment_date, appointment_time,status, created_at
+def fetch_appointments():
+    cursor.execute("SELECT * FROM appointments")
+    return cursor.fetchall()
 
-    # RELASI BALIK: Agar Doctor bisa akses data User induknya
-    user = relationship("User", back_populates="doctor_profile")
+# =========================
+# USAGE
+# =========================
 
-    def to_json(self):
-        return {
-            "id": self.id, # ID Dokter
-            "user_id": self.user_id,
-            "specialization": self.specialization,
-            "schedule": self.schedule,
-            "name": self.user.name # Kita bisa ambil nama dari tabel user lewat relasi
-        }
+users = fetch_users()
+for row in users:
+    print(row)
+
+doctors = fetch_doctors()
+for row in doctors:
+    print(row)
+
+medical_records = fetch_medical_records()
+for row in medical_records:
+    print(row)
+
+appointments = fetch_appointments()
+for row in appointments:
+    print(row)
+
+# =========================
+# CLEANUP
+# =========================
+cursor.close()
+conn.close()
