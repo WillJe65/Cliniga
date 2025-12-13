@@ -1,67 +1,151 @@
-import psycopg2
-
-#ini bisa dikostumisasi sesuai configurasi database yang antum jalanin
-#ini buat connect ke database postgresql di root/database/a.sql
-conn = psycopg2.connect(
-    host="database-pemweb",
-    port=5432,
-    database="webdb",
-    user="user",
-    password="user123"
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Text,
+    Date,
+    Time,
+    DateTime,
+    ForeignKey,
+    CheckConstraint,
+    func
 )
-
-cursor = conn.cursor()
-
-# =========================
-# FUNCTIONS
-# =========================
-
-#ini untuk akses seluruh data di tabel users, tanpa filter apapun
-#isinya id, name, email, password, role, created_at
-def fetch_users():
-    cursor.execute("SELECT * FROM users")
-    return cursor.fetchall()
-
-#ini untuk akses seluruh data di tabel doctors, tanpa filter apapun
-#isinya id, user_id, specialization, schedule, created_at
-def fetch_doctors():
-    cursor.execute("SELECT * FROM doctors")
-    return cursor.fetchall()
-
-#ini untuk akses seluruh data di tabel medical_records, tanpa filter apapun
-#isinya id, appointment_id, diagnosis, notes, created_at
-def fetch_medical_records():
-    cursor.execute("SELECT * FROM medical_records")
-    return cursor.fetchall()
-
-#ini untuk akses seluruh data di tabel appointments, tanpa filter apapun
-#isinya id, patient_id, doctor_id, appointment_date, appointment_time,status, created_at
-def fetch_appointments():
-    cursor.execute("SELECT * FROM appointments")
-    return cursor.fetchall()
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import json
 
 # =========================
-# USAGE
+# DATABASE CONFIG
 # =========================
 
-users = fetch_users()
-for row in users:
-    print(row)
+DATABASE_URL = "postgresql+psycopg2://user:user123@database-pemweb:5432/webdb"
 
-doctors = fetch_doctors()
-for row in doctors:
-    print(row)
-
-medical_records = fetch_medical_records()
-for row in medical_records:
-    print(row)
-
-appointments = fetch_appointments()
-for row in appointments:
-    print(row)
+engine = create_engine(DATABASE_URL, echo=False)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
 
 # =========================
-# CLEANUP
+# MODELS
 # =========================
-cursor.close()
-conn.close()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+    password = Column(Text, nullable=False)
+    role = Column(String(20), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    doctor = relationship("Doctor", back_populates="user", uselist=False)
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "role": self.role,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Doctor(Base):
+    __tablename__ = "doctors"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    specialization = Column(String(100), nullable=False)
+    schedule = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="doctor")
+    appointments = relationship("Appointment", back_populates="doctor")
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "specialization": self.specialization,
+            "schedule": self.schedule,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    appointment_date = Column(Date, nullable=False)
+    appointment_time = Column(Time, nullable=False)
+    status = Column(String(20), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'confirmed', 'completed', 'cancelled')",
+            name="appointment_status_check"
+        ),
+    )
+
+    doctor = relationship("Doctor", back_populates="appointments")
+    medical_record = relationship("MedicalRecord", back_populates="appointment", uselist=False)
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "patient_id": self.patient_id,
+            "doctor_id": self.doctor_id,
+            "appointment_date": self.appointment_date.isoformat(),
+            "appointment_time": self.appointment_time.isoformat(),
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class MedicalRecord(Base):
+    __tablename__ = "medical_records"
+
+    id = Column(Integer, primary_key=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), unique=True, nullable=False)
+    diagnosis = Column(Text, nullable=False)
+    notes = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+    appointment = relationship("Appointment", back_populates="medical_record")
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "appointment_id": self.appointment_id,
+            "diagnosis": self.diagnosis,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+# =========================
+# TEST / OUTPUT
+# =========================
+
+if __name__ == "__main__":
+    session = SessionLocal()
+
+    print("\n=== USERS ===")
+    users = session.query(User).all()
+    print(json.dumps([u.to_json() for u in users], indent=2))
+
+    print("\n=== DOCTORS ===")
+    doctors = session.query(Doctor).all()
+    print(json.dumps([d.to_json() for d in doctors], indent=2))
+
+    print("\n=== APPOINTMENTS ===")
+    appointments = session.query(Appointment).all()
+    print(json.dumps([a.to_json() for a in appointments], indent=2))
+
+    print("\n=== MEDICAL RECORDS ===")
+    records = session.query(MedicalRecord).all()
+    print(json.dumps([m.to_json() for m in records], indent=2))
+
+    session.close()
