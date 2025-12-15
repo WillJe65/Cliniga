@@ -1,5 +1,4 @@
 from sqlalchemy import (
-    create_engine,
     Column,
     Integer,
     String,
@@ -11,22 +10,25 @@ from sqlalchemy import (
     CheckConstraint,
     func
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-import json
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
+from zope.sqlalchemy import register
 
-# =========================
-# DATABASE CONFIG
-# =========================
+# =======================================================
+# 1. SETUP KONEKSI KHUSUS PYRAMID (PENTING!)
+# =======================================================
+# Kita tidak menaruh URL database disini (hardcode), 
+# tapi biarkan __init__.py yang mengaturnya lewat .env / .ini
 
-DATABASE_URL = "postgresql+psycopg2://user:user123@database-pemweb:5432/webdb"
+# Membuat 'DBSession' yang dicari-cari oleh __init__.py
+# Ini adalah "Magic Session" yang otomatis diatur oleh Pyramid
+DBSession = scoped_session(sessionmaker())
+register(DBSession)
 
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
-# =========================
-# MODELS
-# =========================
+# =======================================================
+# 2. MODELS (Kode Anda Sudah Benar, Saya Pertahankan)
+# =======================================================
 
 class User(Base):
     __tablename__ = "users"
@@ -38,7 +40,9 @@ class User(Base):
     role = Column(String(20), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
+    # Relasi
     doctor = relationship("Doctor", back_populates="user", uselist=False)
+    my_appointments = relationship("Appointment", back_populates="patient")
 
     def to_json(self):
         return {
@@ -59,6 +63,7 @@ class Doctor(Base):
     schedule = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
 
+    # Relasi
     user = relationship("User", back_populates="doctor")
     appointments = relationship("Appointment", back_populates="doctor")
 
@@ -90,6 +95,8 @@ class Appointment(Base):
         ),
     )
 
+    # Relasi
+    patient = relationship("User", back_populates="my_appointments")
     doctor = relationship("Doctor", back_populates="appointments")
     medical_record = relationship("MedicalRecord", back_populates="appointment", uselist=False)
 
@@ -98,8 +105,8 @@ class Appointment(Base):
             "id": self.id,
             "patient_id": self.patient_id,
             "doctor_id": self.doctor_id,
-            "appointment_date": self.appointment_date.isoformat(),
-            "appointment_time": self.appointment_time.isoformat(),
+            "appointment_date": str(self.appointment_date), # Pakai str() lebih aman untuk Date object
+            "appointment_time": str(self.appointment_time), # Pakai str() lebih aman untuk Time object
             "status": self.status,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
@@ -114,6 +121,7 @@ class MedicalRecord(Base):
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
 
+    # Relasi
     appointment = relationship("Appointment", back_populates="medical_record")
 
     def to_json(self):
@@ -124,28 +132,3 @@ class MedicalRecord(Base):
             "notes": self.notes,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
-
-# =========================
-# TEST / OUTPUT
-# =========================
-
-if __name__ == "__main__":
-    session = SessionLocal()
-
-    print("\n=== USERS ===")
-    users = session.query(User).all()
-    print(json.dumps([u.to_json() for u in users], indent=2))
-
-    print("\n=== DOCTORS ===")
-    doctors = session.query(Doctor).all()
-    print(json.dumps([d.to_json() for d in doctors], indent=2))
-
-    print("\n=== APPOINTMENTS ===")
-    appointments = session.query(Appointment).all()
-    print(json.dumps([a.to_json() for a in appointments], indent=2))
-
-    print("\n=== MEDICAL RECORDS ===")
-    records = session.query(MedicalRecord).all()
-    print(json.dumps([m.to_json() for m in records], indent=2))
-
-    session.close()

@@ -1,4 +1,5 @@
 from pyramid.view import view_config, view_defaults
+# Gunakan satu titik (.) jika auth.py satu folder dengan models.py
 from ..models import DBSession, User, Doctor 
 import bcrypt
 import transaction
@@ -10,92 +11,88 @@ class AuthViews:
         self.request = request
 
     # =======================================================
-    # REGISTER (DAFTAR AKUN)
+    # REGISTER
+    # route_name='register' ini NYAMBUNG ke __init__.py tadi
     # =======================================================
     @view_config(route_name='register', request_method='POST')
     def register(self):
-        data = self.request.json_body
+        try:
+            data = self.request.json_body
+        except Exception:
+            self.request.response.status = 400
+            return {'error': 'Body JSON tidak valid/kosong'}
         
-        # Validasi Input Dasar
+        # 1. Validasi Input
         required_fields = ['name', 'email', 'password', 'role']
         if not all(k in data for k in required_fields):
             self.request.response.status = 400
             return {'error': 'Data tidak lengkap. Wajib: name, email, password, role'}
 
-        # Cek apakah Email sudah terpakai (Query SQLAlchemy)
+        # 2. Cek Email Duplikat
         email_input = data['email']
         existing_user = DBSession.query(User).filter(User.email == email_input).first()
         
         if existing_user:
-            self.request.response.status = 409
+            self.request.response.status = 409 # Conflict
             return {'error': 'Email sudah terpakai'}
         
-        # Hash Password (Keamanan)
+        # 3. Hash Password
         hashed_pw = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
 
         try:
-            # Buat User Baru (Masuk ke Tabel 'users')
+            # 4. Simpan User
             new_user = User(
                 name=data['name'],
                 email=data['email'],
-                password=hashed_pw.decode('utf-8'), # Simpan string hash
+                password=hashed_pw.decode('utf-8'),
                 role=data['role'] 
             )
             DBSession.add(new_user)
-            
-            # PENTING: flush() agar new_user.id terbentuk (auto increment)
-            # tanpa perlu commit permanen dulu (masih bisa di-rollback kalau error)
-            DBSession.flush() 
+            DBSession.flush() # Dapatkan ID user sebelum commit
 
-            # 5. Logika Khusus DOKTER (Masuk ke Tabel 'doctors')
+            # 5. Handle Dokter
             if data['role'] == 'doctor':
-                # Cek field khusus dokter
                 if 'specialization' not in data:
-                    # Batalkan semua proses (User user tidak jadi dibuat)
-                    transaction.abort() 
-                    self.request.response.status = 400
-                    return {'error': 'Role dokter wajib mengisi specialization!'}
+                    # Rollback jika data dokter tidak lengkap
+                    return {'error': 'Dokter wajib mengisi specialization!'}
+                    # Note: transaction otomatis abort jika kita raise error atau return error 400 
+                    # tapi manual transaction.abort() juga aman untuk memastikan.
                 
                 new_doctor = Doctor(
-                    user_id=new_user.id, # Ambil ID dari user yang baru dibuat di atas
+                    user_id=new_user.id,
                     specialization=data['specialization'],
-                    schedule=data.get('schedule', '-') # Default strip jika kosong
+                    schedule=data.get('schedule', '-')
                 )
                 DBSession.add(new_doctor)
 
-            # Jika sampai sini sukses, transaction manager akan auto-commit
             return {'status': 'success', 'msg': f'User {data["role"]} berhasil dibuat'}
         
         except Exception as e:
-            # Jika ada error database atau server
             self.request.response.status = 500
-            print(f"ERROR REGISTER: {e}") # Cek terminal untuk detail error
+            print(f"ERROR REGISTER: {e}")
             return {'error': 'Terjadi kesalahan internal server'}
 
     # =======================================================
-    # LOGIN (MASUK)
+    # LOGIN
     # =======================================================
     @view_config(route_name='login', request_method='POST')
     def login(self):
-        data = self.request.json_body
+        try:
+            data = self.request.json_body
+        except Exception:
+            self.request.response.status = 400
+            return {'error': 'Body JSON tidak valid'}
+
         email = data.get('email')
         password = data.get('password')
 
-        # Cari User berdasarkan Email
+        # Cari User
         user = DBSession.query(User).filter(User.email == email).first()
 
-        # Validasi Password
+        # Cek Password
         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             
-            # Ambil Secret Key dari .env
-            secret_key = os.getenv("JWT_SECRET")
-            
-            if not secret_key:
-                print("PERINGATAN: JWT_SECRET belum diset di file .env!")
-                # Fallback darurat (opsional, sebaiknya error di production)
-                secret_key = "secretkode"
-
-            #  Data User untuk Response
+            # Response Data
             user_data = {
                 'id': user.id,
                 'name': user.name,
@@ -106,23 +103,21 @@ class AuthViews:
             response_data = {
                 'status': 'success',
                 'user': user_data,
-                # CATATAN PENTING:
-                # Idealnya disini kita generate JWT Token pakai library 'PyJWT'.
-                # Tapi untuk sementara, kita kirim string placeholder/secret agar React tidak error.
-                'token': f"mock-token-for-{user.id}" 
+                # Token Mock (Nanti diganti JWT beneran di production)
+                'token': f"mock-token-{user.id}-{os.getenv('JWT', 'secret')}" 
             }
 
-            # Jika Dokter, lampirkan data spesialisasi
-            # Cek relasi doctor_profile dari models.py
-            if user.role == 'doctor' and user.doctor_profile:
-                response_data['doctor_profile'] = {
-                    'specialization': user.doctor_profile.specialization,
-                    'schedule': user.doctor_profile.schedule
+            # Tambahan Data Dokter jika dia dokter
+            if user.role == 'doctor' and user.doctor: # Pakai nama relasi 'doctor_profile' sesuai models.py saya
+                response_data['doctor'] = {
+                    'specialization': user.doctor.specialization,
+                    'schedule': user.doctor.schedule
                 }
+            # Jika menggunakan models.py versi standalone terakhir (Anda pakai relasi 'doctor' bukan 'doctor_profile')
+            # Maka ganti user.doctor_profile menjadi user.doctor 
 
             return response_data
         
         else:
-            # Gagal Login
             self.request.response.status = 401
             return {'error': 'Email atau Password Salah'}

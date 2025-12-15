@@ -50,8 +50,8 @@ def main(global_config, **settings):
         # ==========================================
         # 1. Routing AUTH
         # ==========================================
-        config.add_route('register', '/api/register')
-        config.add_route('login', '/api/login')
+        config.add_route('register', '/api/auth/register')
+        config.add_route('login', '/api/auth/login')
 
         # ==========================================
         # 2. Routing APPOINTMENTS
