@@ -47,14 +47,44 @@ def main(global_config, **settings):
         
         config.include('pyramid_tm')
         
-        # Routing API
+        # ==========================================
+        # 1. Routing AUTH
+        # ==========================================
         config.add_route('register', '/api/register')
         config.add_route('login', '/api/login')
+
+        # ==========================================
+        # 2. Routing APPOINTMENTS
+        # ==========================================
         config.add_route('create-appointment', '/api/appointments/create-appointment')
         config.add_route('edit-appointment', '/api/appointments/edit-appointment')
         config.add_route('delete-appointment', '/api/appointments/delete-appointment')
         config.add_route('show-appointments', '/api/appointments/show-appointments')
         config.add_route('filter-appointments', '/api/appointments/filter-appointments')
         
+        # ==========================================
+        # 3. Routing ACCOUNTS (Profil & Setting)
+        # ==========================================
+        # Profil & Jadwal Dokter
+        config.add_route('account_profile', '/api/account/profile') 
+        # Ubah Password
+        config.add_route('account_change_password', '/api/account/change-password')
+        # Ubah Jadwal (Khusus Dokter)
+        config.add_route('account_update_schedule', '/api/account/update-schedule')
+        # Logout
+        config.add_route('account_logout', '/api/logout')
+
+        # ==========================================
+        # 4. Routing MEDICAL RECORDS
+        # ==========================================
+        # Create (Dokter mengisi hasil periksa)
+        config.add_route('create_medical_record', '/api/medical-records/create')
+        # Get Detail (Pasien melihat hasil 1 appointment tertentu)
+        config.add_route('get_medical_record', '/api/medical-records/detail')
+        # Get History (Pasien melihat semua riwayat sakitnya)
+        config.add_route('get_patient_history', '/api/medical-records/history')
+        
+        # Scan folder views untuk mendaftarkan endpoint
         config.scan('.views')
+
     return config.make_wsgi_app()
