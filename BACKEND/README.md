@@ -42,7 +42,7 @@ Login akun yang sudah terdaftar
 * **Method:** `POST`
 * **Content-Type:** `application/json`
 
-**Request Body (Doctor):**
+**login Body :**
 ```json
 {
   "email": "budi@example.com",
@@ -66,5 +66,6 @@ Membuat jadwal temu dengan doktor
   "appointment_time": "14:30"
 }
 ```
+
 
 dah capek , tambahin wak
