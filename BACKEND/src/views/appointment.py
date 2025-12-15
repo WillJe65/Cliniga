@@ -4,7 +4,7 @@ from datetime import datetime, date, time
 import transaction
 
 @view_defaults(renderer='json')
-class AppointmentViews:  # <--- GANTI NAMA CLASS
+class AppointmentViews:
     def __init__(self, request):
         self.request = request
     
@@ -21,33 +21,33 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
             return {'error': 'Data tidak lengkap. Wajib: patient_id, doctor_id, appointment_date, appointment_time'}
         
         try:
-            # KONVERSI DATA: String (JSON) -> Python Object
-            # "2025-12-25" -> date(2025, 12, 25)
+            # Konversi String -> Object
             date_obj = datetime.strptime(data['appointment_date'], '%Y-%m-%d').date()
-            # "14:30" -> time(14, 30)
             time_obj = datetime.strptime(data['appointment_time'], '%H:%M').time()
 
-            # VALIDASI LOGIKA: Tidak boleh booking tanggal masa lalu
+            # Validasi Waktu (Tidak boleh masa lalu)
             now = datetime.now()
             if date_obj < date.today() or (date_obj == date.today() and time_obj <= now.time()):
                 self.request.response.status = 400
                 return {'error': 'Tanggal dan waktu janji temu harus di masa depan'}
             
-            # SIMPAN KE DB
-            # Gunakan 'AppointmentModel' (nama alias yang kita buat di import)
+            # Simpan ke DB dengan status awal 'pending'
             new_appointment = AppointmentModel(
                 patient_id=data['patient_id'],
                 doctor_id=data['doctor_id'],
                 appointment_date=date_obj,
                 appointment_time=time_obj,
-                status='pending'
+                status='pending' # Default status
             )
             
             DBSession.add(new_appointment)
-            # transaction.commit() <-- Tidak perlu manual commit jika pakai pyramid_tm
-            DBSession.flush() # Flush agar kita bisa dapat ID-nya
+            DBSession.flush() 
             
-            return {'status': 'success', 'message': 'Janji temu berhasil dibuat', 'appointment_id': new_appointment.id}
+            return {
+                'status': 'success', 
+                'message': 'Janji temu berhasil dibuat', 
+                'appointment_id': new_appointment.id
+            }
             
         except ValueError:
             self.request.response.status = 400
@@ -57,7 +57,7 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
             return {'error': 'Gagal membuat janji temu', 'details': str(e)}
     
     # ---------------------------------------------------------
-    # EDIT APPOINTMENT
+    # EDIT APPOINTMENT (Dokter Terima/Tolak)
     # ---------------------------------------------------------
     @view_config(route_name="edit-appointment", request_method='PUT')
     def edit_appointment(self):
@@ -68,43 +68,64 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
             self.request.response.status = 400
             return {'error': 'appointment_id wajib disertakan'}
         
-        # Cari data
+        # Cari data appointment
         appointment = DBSession.query(AppointmentModel).filter(AppointmentModel.id == appointment_id).first()
         if not appointment:
             self.request.response.status = 404
             return {'error': 'Janji temu tidak ditemukan'}
         
         try:
-            # Update Date jika ada
+            # Update Tanggal/Jam (Reschedule)
             if 'appointment_date' in data:
                 appointment.appointment_date = datetime.strptime(data['appointment_date'], '%Y-%m-%d').date()
-            
-            # Update Time jika ada
             if 'appointment_time' in data:
                 appointment.appointment_time = datetime.strptime(data['appointment_time'], '%H:%M').time()
             
-            # Update Status
+            # Update Status (Logika Terima/Tolak Dokter)
             if 'status' in data:
                 new_status = data['status']
+                current_status = appointment.status
                 
-                # Validasi Status
-                if new_status not in ['pending', 'confirmed', 'completed', 'cancelled']:
+                valid_statuses = ['pending', 'confirmed', 'completed', 'cancelled']
+                
+                # Validasi Input Status
+                if new_status not in valid_statuses:
                     self.request.response.status = 400
-                    return {'error': 'Status tidak valid'}
+                    return {'error': f'Status tidak valid. Pilihan: {valid_statuses}'}
+
+                # Logika Transisi Status (State Machine)
                 
-                # Perbaikan Syntax 'else if' -> 'elif'
+                # Dokter MENERIMA (Pending -> Confirmed)
+                if new_status == 'confirmed':
+                    if current_status != 'pending':
+                        self.request.response.status = 400
+                        return {'error': 'Hanya janji temu "pending" yang bisa dikonfirmasi'}
+                
+                # Dokter MENOLAK / Membatalkan (Pending/Confirmed -> Cancelled)
+                elif new_status == 'cancelled':
+                    if current_status == 'completed':
+                        self.request.response.status = 400
+                        return {'error': 'Janji temu yang sudah selesai tidak bisa dibatalkan'}
+                    
+                # Skenario: Dokter Menyelesaikan Tugas (Confirmed -> Completed)
                 elif new_status == 'completed':
-                    # Logika opsional, tergantung apakah dokter boleh manual complete atau tidak
-                    # Jika ingin membolehkan dokter mengubah jadi complete, hapus blok elif ini
-                    self.request.response.status = 400
-                    return {'error': 'Status completed hanya dapat diatur oleh sistem/dokter setelah selesai'}
-                
-                elif new_status == 'cancelled' and appointment.status == 'completed':
-                    self.request.response.status = 400
-                    return {'error': 'Janji temu yang sudah completed tidak dapat dibatalkan'}
-                
+                    if current_status != 'confirmed':
+                        self.request.response.status = 400
+                        return {'error': 'Hanya janji temu yang sudah dikonfirmasi yang bisa diselesaikan'}
+
+                # Terapkan perubahan status
                 appointment.status = new_status
-            return {'status': 'success', 'message': 'Janji temu berhasil diupdate'}
+            
+            return {
+                'status': 'success', 
+                'message': f'Janji temu berhasil diupdate menjadi {appointment.status}',
+                'data': {
+                    'id': appointment.id,
+                    'status': appointment.status,
+                    'date': str(appointment.appointment_date),
+                    'time': str(appointment.appointment_time)
+                }
+            }
 
         except ValueError:
              self.request.response.status = 400
@@ -116,17 +137,7 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
     @view_config(route_name="show-appointments", request_method='GET')
     def show_appointments(self):
         appointments = DBSession.query(AppointmentModel).all()
-        result = []
-        for appt in appointments:
-            result.append({
-                'id': appt.id,
-                'patient_id': appt.patient_id,
-                'doctor_id': appt.doctor_id,
-                'appointment_date': str(appt.appointment_date),
-                'appointment_time': str(appt.appointment_time),
-                'status': appt.status 
-            })
-        return {'appointments': result}
+        return {'appointments': [self._serialize(appt) for appt in appointments]}
     
     # ---------------------------------------------------------
     # FILTER APPOINTMENTS
@@ -140,7 +151,6 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
         
         query = DBSession.query(AppointmentModel)
         
-        #  Try-Except untuk user kirim id berupa huruf
         try:
             if doctor_id:
                 query = query.filter(AppointmentModel.doctor_id == int(doctor_id))
@@ -150,18 +160,19 @@ class AppointmentViews:  # <--- GANTI NAMA CLASS
                 query = query.filter(AppointmentModel.status == status)
             
             appointments = query.all()
-            result = []
-            for appt in appointments:
-                result.append({
-                    'id': appt.id,
-                    'patient_id': appt.patient_id,
-                    'doctor_id': appt.doctor_id,
-                    'appointment_date': str(appt.appointment_date),
-                    'appointment_time': str(appt.appointment_time),
-                    'status': appt.status
-                })
-            return {'appointments': result}
+            return {'appointments': [self._serialize(appt) for appt in appointments]}
             
         except ValueError:
             self.request.response.status = 400
             return {'error': 'ID harus berupa angka'}
+
+    # Helper function untuk merapikan kode
+    def _serialize(self, appt):
+        return {
+            'id': appt.id,
+            'patient_id': appt.patient_id,
+            'doctor_id': appt.doctor_id,
+            'appointment_date': str(appt.appointment_date),
+            'appointment_time': str(appt.appointment_time),
+            'status': appt.status
+        }
