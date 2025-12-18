@@ -84,6 +84,11 @@ def main(global_config, **settings):
         # Get History (Pasien melihat semua riwayat sakitnya)
         config.add_route('get_patient_history', '/api/medical-records/history')
         
+
+        #==========================================
+        # 5. Routing DOCTORS (Daftar Dokter & Spesialisasi)
+        #==========================================
+        config.add_route('get_doctors', '/api/doctors')
         # Scan folder views untuk mendaftarkan endpoint
         config.scan('.views')
 

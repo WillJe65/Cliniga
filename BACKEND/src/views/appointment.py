@@ -131,13 +131,13 @@ class AppointmentViews:
              self.request.response.status = 400
              return {'error': 'Format tanggal/jam salah'}
 
-    # ---------------------------------------------------------
+   # ---------------------------------------------------------
     # SHOW ALL APPOINTMENTS
     # ---------------------------------------------------------
     @view_config(route_name="show-appointments", request_method='GET')
     def show_appointments(self):
         appointments = DBSession.query(AppointmentModel).all()
-        return {'appointments': [self._serialize(appt) for appt in appointments]}
+        return {'appointments': [appt.to_json() for appt in appointments]}
     
     # ---------------------------------------------------------
     # FILTER APPOINTMENTS
@@ -149,30 +149,42 @@ class AppointmentViews:
         patient_id = request_params.get('patient_id')
         status = request_params.get('status')
         
+        # Parameter baru: 'upcoming' (true/false)
+        is_upcoming = request_params.get('upcoming')
+        
         query = DBSession.query(AppointmentModel)
         
         try:
+            # Filter User ID
             if doctor_id:
                 query = query.filter(AppointmentModel.doctor_id == int(doctor_id))
             if patient_id:
                 query = query.filter(AppointmentModel.patient_id == int(patient_id))
+            
+            # Filter Status
             if status:
                 query = query.filter(AppointmentModel.status == status)
             
+            # FITUR BARU: Filter Upcoming (Hanya yang akan datang)
+            if is_upcoming == 'true':
+                today = date.today()
+                # Ambil yang tanggalnya >= hari ini
+                query = query.filter(AppointmentModel.appointment_date >= today)
+                # PENTING: Urutkan dari tanggal terdekat, lalu jam terdekat
+                query = query.order_by(
+                    AppointmentModel.appointment_date.asc(), 
+                    AppointmentModel.appointment_time.asc()
+                )
+            else:
+                # Default: Urutkan dari yang terbaru dibuat (opsional)
+                query = query.order_by(AppointmentModel.created_at.desc())
+
             appointments = query.all()
-            return {'appointments': [self._serialize(appt) for appt in appointments]}
+            
+            # Convert ke JSON (Gunakan to_json bawaan model biar rapi)
+            # Pastikan models.py Anda sudah punya method to_json() yang return patient_name
+            return {'appointments': [appt.to_json() for appt in appointments]}
             
         except ValueError:
             self.request.response.status = 400
             return {'error': 'ID harus berupa angka'}
-
-    # Helper function untuk merapikan kode
-    def _serialize(self, appt):
-        return {
-            'id': appt.id,
-            'patient_id': appt.patient_id,
-            'doctor_id': appt.doctor_id,
-            'appointment_date': str(appt.appointment_date),
-            'appointment_time': str(appt.appointment_time),
-            'status': appt.status
-        }

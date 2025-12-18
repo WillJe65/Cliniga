@@ -1,9 +1,10 @@
 from pyramid.view import view_config, view_defaults
-# Gunakan satu titik (.) jika auth.py satu folder dengan models.py
 from ..models import DBSession, User, Doctor 
 import bcrypt
 import transaction
 import os 
+import jwt
+import datetime
 
 @view_defaults(renderer='json')
 class AuthViews:
@@ -12,7 +13,6 @@ class AuthViews:
 
     # =======================================================
     # REGISTER
-    # route_name='register' ini NYAMBUNG ke __init__.py tadi
     # =======================================================
     @view_config(route_name='register', request_method='POST')
     def register(self):
@@ -86,13 +86,34 @@ class AuthViews:
         email = data.get('email')
         password = data.get('password')
 
-        # Cari User
         user = DBSession.query(User).filter(User.email == email).first()
 
-        # Cek Password
         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             
-            # Response Data
+            # 1. Ambil Secret Key
+            secret_key = os.getenv("JWT")
+            if not secret_key:
+                print("CRITICAL: JWT belum ada di .env")
+                
+
+            # 2. Tentukan Kapan Token Expire (Misal: 24 Jam dari sekarang)
+            # Menggunakan timezone UTC agar konsisten
+            expiration_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
+
+            # 3. Siapkan Isi Tiket (Payload)
+            payload = {
+                'sub': user.id,          # Subject (ID User)
+                'name': user.name,       # Info tambahan (opsional)
+                'role': user.role,       # Info role (penting buat frontend)
+                'exp': expiration_time,  # Kapan tiket hangus
+                'iat': datetime.datetime.now(datetime.timezone.utc) # Kapan tiket dibuat (Issued At)
+            }
+
+            # 4. GENERATE TOKEN (Encode)
+            # Payload + Secret = Token String
+            token_string = jwt.encode(payload, secret_key, algorithm='HS256')
+
+            # 5. Response ke Frontend
             user_data = {
                 'id': user.id,
                 'name': user.name,
@@ -103,18 +124,15 @@ class AuthViews:
             response_data = {
                 'status': 'success',
                 'user': user_data,
-                # Token Mock (Nanti diganti JWT beneran di production)
-                'token': f"mock-token-{user.id}-{os.getenv('JWT', 'secret')}" 
+                'token': token_string  # <--- INI SEKARANG TOKEN ASLI
             }
 
-            # Tambahan Data Dokter jika dia dokter
-            if user.role == 'doctor' and user.doctor: # Pakai nama relasi 'doctor_profile' sesuai models.py saya
-                response_data['doctor'] = {
+            # Tambahan Data Dokter
+            if user.role == 'doctor' and user.doctor:
+                response_data['doctor_profile'] = {
                     'specialization': user.doctor.specialization,
                     'schedule': user.doctor.schedule
                 }
-            # Jika menggunakan models.py versi standalone terakhir (Anda pakai relasi 'doctor' bukan 'doctor_profile')
-            # Maka ganti user.doctor_profile menjadi user.doctor 
 
             return response_data
         

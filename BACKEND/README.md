@@ -1,23 +1,18 @@
 # FOR FRONTEND(IED)
-
 Untuk berikut bentuk JSON file yang akan dikirim
 
 ## URL API:
-
-## 🔐 1. Auth
+## 🔐 1. Auth 
 
 ### A. Register (Daftar Akun)
-
 Mendaftarkan pengguna baru (Pasien atau Dokter).
 
-- **URL:** `/api/auth/register`
-- **Method:** `POST`
-- **Content-Type:** `application/json`
+* **URL:** `/api/auth/register`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
 
 ### UNTUK PASIEN:
-
 **Request Body (Pasien):**
-
 ```json
 {
   "name": "NateHiggers",
@@ -28,9 +23,7 @@ Mendaftarkan pengguna baru (Pasien atau Dokter).
 ```
 
 ### UNTUK DOCTOR:
-
 **Request Body (Doctor):**
-
 ```json
 {
   "name": "Dr. black",
@@ -43,15 +36,13 @@ Mendaftarkan pengguna baru (Pasien atau Dokter).
 ```
 
 ### B. Login Akun
-
 Login akun yang sudah terdaftar
 
-- **URL:** `/api/auth/login`
-- **Method:** `POST`
-- **Content-Type:** `application/json`
+* **URL:** `/api/auth/login`
+* **Method:** `POST`
+* **Content-Type:** `application/json`
 
-**login Body :**
-
+**Request Body (Doctor):**
 ```json
 {
   "email": "budi@example.com",
@@ -59,24 +50,128 @@ Login akun yang sudah terdaftar
 }
 ```
 
-### C. CREATE APPOINMENT
+### DROPDOWN / TABEL UNTUK MENAMPILKAN SELURUH DOKTOR
+ untuk mengisi dropdown "Pilih Dokter" di halaman Booking.
+* **URL:** `/api/doctors`
+* **Method:** `GET`
 
+```json
+[
+    {
+        "id": 1, 
+        "name": "Dr. Black",
+        "specialization": "Bedah ngawi",
+        "schedule": "Senin - Jumat..."
+    },
+    {
+        "id": 2,
+        "name": "Dr. Boyke",
+        "specialization": "Kandungan",
+        "schedule": "Sabtu Minggu..."
+    }
+]
+```
+
+## 2. CREATE APPOINMENT 
+### A. Create Appointment (Pasien Booking)
 Membuat jadwal temu dengan doktor
 
-- **URL:** `/api/appointment/create-appointment`
-- **Method:** `POST`
-- **Content-Type:** `application/json`
+* **URL:** `/api/appointment/create-appointment`
+* **Method:** `POST`
 
 ```json
 {
-  "patient_id": 5,
-  "doctor_id": 1,#sesuaikan dengan user atau doctor yang ditemu
-  "appointment_date": "2025-12-25",
-  "appointment_time": "14:30"
+    "patient_id": 5,          // Ambil dari LocalStorage user.id
+    "doctor_id": 1,           // Ambil dari value dropdown dokter
+    "appointment_date": "2025-12-25", // Format YYYY-MM-DD
+    "appointment_time": "14:00"       // Format HH:MM
 }
 ```
 
-## 👤 2. Fitur Akun (Account)
+**RESPONSE:**
+```json
+{
+  "status": "success",
+  "message": "Janji temu berhasil dibuat",
+  "appointment_id": 15
+}
+```
+
+### B. Get List / Filter (Untuk Tabel Dashboard)
+* **URL:** `/api/appointment/filter-appointments`
+* **Method:** `GET`
+
+* **Parameter (Query Params):**
+- Untuk Dokter (Lihat jadwalnya sendiri): ?doctor_id=1&upcoming=true (Menampilkan jadwal hari ini ke depan, urut dari yang terdekat)
+- Untuk Pasien (Lihat riwayatnya sendiri): ?patient_id=5
+
+**RESPONSE:**
+```json
+{
+    "appointments": [
+        {
+            "id": 10,
+            "date": "2025-12-25",
+            "time": "14:00:00",
+            "status": "pending",
+            "patient_name": "Budi Santoso",
+            "doctor_name": "Dr. Strange",
+            "doctor_spec": "Bedah Syaraf"
+        }
+    ]
+}
+```
+
+### C. Edit / Update Status (Reschedule & Konfirmasi)
+Digunakan dokter untuk menerima janji, menolak, menyelesaikan, atau merubah jadwal.
+
+* **URL:** `/api/appointment/edit-appointment`
+* **Method:** `PUT`
+
+* **Request Body (Contoh Konfirmasi yang dilakukan doctor):**
+```json
+{
+  "appointment_id": 15,    // Wajib ada
+  "status": "confirmed"    // Opsional
+}
+```
+
+* **Request Body (Contoh Reschedule):**
+```json
+{
+  "appointment_id": 15,
+  "appointment_date": "2025-12-31", // Ubah tanggal, Wajib format (YYYY-MM-DD)
+  "appointment_time": "10:00"       // Ubah jam, wajib format (HH:MM)
+}
+```
+
+* **Aturan Perubahan Status (State Machine):**
+- Pending $\rightarrow$ Confirmed: ✅ Boleh (Dokter menerima janji).
+- Pending $\rightarrow$ Cancelled: ✅ Boleh (Dokter menolak janji).
+- Confirmed $\rightarrow$ Completed: ✅ Boleh (Pemeriksaan selesai).
+- Confirmed $\rightarrow$ Cancelled: ✅ Boleh (membatalkan janji).
+- Completed $\rightarrow$ Cancelled: ❌ Tidak (Data historis tidak boleh diubah).
+- Pending $\rightarrow$ Completed: ❌ Tidak (Harus dikonfirmasi dulu baru bisa selesai).
+
+* **Response Sukses:**
+```json
+{
+  "status": "success",
+  "message": "Janji temu berhasil diupdate menjadi confirmed",
+  "data": { ... } // nanti bentuknya seperti berikut misalkan success
+  //{
+  //"status": "success",
+  //"message": "Janji temu berhasil diupdate menjadi confirmed",
+  //"data": {
+      //"id": 15,
+      //"status": "confirmed",
+      //"date": "2025-12-31",
+      //"time": "10:00:00"
+  //}
+}
+```
+
+## 👤 3. Fitur Akun (Account)
 
 Fitur ini digunakan untuk mengelola profil pengguna, baik bagi Pasien maupun Dokter.
 
@@ -144,7 +239,7 @@ Menghapus sesi pengguna di sisi client.
 - **URL:** `/api/account/logout`
 - **Method:** `POST`
 
-## 🏥 3. Fitur Rekam Medis (Medical Record)
+## 🏥 4. Fitur Rekam Medis (Medical Record)
 
 Fitur ini menangani pencatatan hasil pemeriksaan oleh dokter dan riwayat kesehatan pasien.
 
@@ -194,3 +289,23 @@ Melihat daftar seluruh rekam medis yang pernah dicatat untuk satu pasien tertent
   ]
 }
 ```
+
+##  5. Mendapatkan daftar doctor
+
+Melihat daftar seluruh rekam medis yang pernah dicatat untuk satu pasien tertentu.
+
+- **URL:** `/api/doctors`
+- **Method:** `GET`
+
+RESPON : 
+```json
+[
+    {
+        "id": 1,
+        "name": "Dr. Strange",
+        "specialization": "Bedah Syaraf",
+        "schedule": "Senin-Jumat 08:00-14:00"
+    }
+]
+```
+

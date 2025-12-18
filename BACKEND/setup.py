@@ -9,7 +9,8 @@ requires = [
     'waitress',
     'alembic',
     'bcrypt',
-    'python-dotenv'
+    'python-dotenv',
+    'PyJWT'
 ]
 
 dev_requires = [
