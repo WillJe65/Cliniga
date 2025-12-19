@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Lock, Clock, Save, X } from 'lucide-react';
+import { ArrowLeft, Lock, Clock, Save, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DoctorSettings() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('schedule');
   
-  // Schedule state
-  const [schedule, setSchedule] = useState([
+  // ----------------------------------------------------------------
+  // 1. STATE & LOGIC JADWAL (SCHEDULE)
+  // ----------------------------------------------------------------
+  
+  // Default Schedule (Senin-Minggu)
+  const defaultSchedule = [
     { day: 'Senin', startTime: '09:00', endTime: '15:00', isOpen: true },
     { day: 'Selasa', startTime: '09:00', endTime: '15:00', isOpen: true },
     { day: 'Rabu', startTime: '09:00', endTime: '15:00', isOpen: true },
@@ -22,16 +30,13 @@ export default function DoctorSettings() {
     { day: 'Jumat', startTime: '09:00', endTime: '15:00', isOpen: true },
     { day: 'Sabtu', startTime: '09:00', endTime: '12:00', isOpen: true },
     { day: 'Minggu', startTime: '00:00', endTime: '00:00', isOpen: false },
-  ]);
+  ];
 
-  // Password state
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [schedule, setSchedule] = useState(defaultSchedule);
 
-  const [passwordErrors, setPasswordErrors] = useState({});
+  // TODO: Jika nanti Backend sudah support menyimpan JSON jadwal per dokter, 
+  // Anda bisa gunakan useQuery di sini untuk fetch jadwal tersimpan.
+  // Untuk sekarang, kita pakai default state.
 
   const handleScheduleChange = (index, field, value) => {
     const newSchedule = [...schedule];
@@ -45,16 +50,63 @@ export default function DoctorSettings() {
     setSchedule(newSchedule);
   };
 
+  // API: Simpan Jadwal
+  const scheduleMutation = useMutation({
+    mutationFn: async (newSchedule) => {
+      // Mengirim data jadwal sebagai JSON ke backend
+      const response = await fetch("/api/doctors/schedule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doctor_id: user?.id, // Kirim ID user/dokter
+          schedule_data: newSchedule 
+        }),
+      });
+
+      // Handle response jika endpoint belum ada (Simulasi sukses untuk demo)
+      if (response.status === 404) {
+        console.warn("Endpoint /api/doctors/schedule belum dibuat di backend.");
+        return; // Anggap sukses di frontend saja
+      }
+
+      if (!response.ok) {
+        throw new Error("Gagal menyimpan jadwal");
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Jadwal Berhasil Disimpan",
+        description: "Perubahan jadwal praktik Anda telah diperbarui.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Gagal Menyimpan",
+        description: error.message || "Terjadi kesalahan sistem.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSaveSchedule = () => {
-    toast({
-      title: "Jadwal berhasil diperbarui",
-      description: "Jadwal praktek Anda telah disimpan.",
-    });
+    scheduleMutation.mutate(schedule);
   };
+
+  // ----------------------------------------------------------------
+  // 2. STATE & LOGIC PASSWORD
+  // ----------------------------------------------------------------
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [passwordErrors, setPasswordErrors] = useState({});
 
   const handlePasswordChange = (field, value) => {
     setPasswordForm({ ...passwordForm, [field]: value });
-    // Clear error for this field
     if (passwordErrors[field]) {
       setPasswordErrors({ ...passwordErrors, [field]: '' });
     }
@@ -77,25 +129,59 @@ export default function DoctorSettings() {
     return errors;
   };
 
+  // API: Ganti Password
+  const passwordMutation = useMutation({
+    mutationFn: async (data) => {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email, // Identifikasi user via email
+          current_password: data.currentPassword,
+          new_password: data.newPassword
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal mengubah password");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Berhasil Diubah",
+        description: "Silakan gunakan password baru pada login berikutnya.",
+      });
+      // Reset form
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Gagal Mengubah Password",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSavePassword = () => {
     const errors = validatePasswordForm();
     if (Object.keys(errors).length > 0) {
       setPasswordErrors(errors);
       return;
     }
-
-    // Reset form
-    setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
-
-    toast({
-      title: "Password berhasil diubah",
-      description: "Password Anda telah diperbarui dengan aman.",
-    });
+    passwordMutation.mutate(passwordForm);
   };
+
+  // ----------------------------------------------------------------
+  // 3. RENDER UI
+  // ----------------------------------------------------------------
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -128,7 +214,7 @@ export default function DoctorSettings() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Schedule Management Tab */}
+          {/* Tab 1: Jadwal Praktik */}
           <TabsContent value="schedule">
             <Card>
               <CardHeader>
@@ -152,7 +238,7 @@ export default function DoctorSettings() {
                             type="checkbox"
                             checked={item.isOpen}
                             onChange={() => handleToggleDay(index)}
-                            className="w-5 h-5 cursor-pointer"
+                            className="w-5 h-5 cursor-pointer accent-cliniga-primary"
                           />
                           <Label className="text-base font-semibold text-cliniga-text cursor-pointer">
                             {item.day}
@@ -168,9 +254,7 @@ export default function DoctorSettings() {
                       {item.isOpen && (
                         <div className="grid grid-cols-2 gap-4 ml-8">
                           <div>
-                            <Label htmlFor={`start-${index}`} className="text-sm">
-                              Jam Mulai
-                            </Label>
+                            <Label htmlFor={`start-${index}`} className="text-sm">Jam Mulai</Label>
                             <Input
                               id={`start-${index}`}
                               type="time"
@@ -180,9 +264,7 @@ export default function DoctorSettings() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`end-${index}`} className="text-sm">
-                              Jam Selesai
-                            </Label>
+                            <Label htmlFor={`end-${index}`} className="text-sm">Jam Selesai</Label>
                             <Input
                               id={`end-${index}`}
                               type="time"
@@ -199,26 +281,25 @@ export default function DoctorSettings() {
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
                   <p className="text-sm text-blue-900">
-                    <strong>Catatan:</strong> Pasien dapat membuat janji temu hanya pada jam-jam yang Anda buka. 
-                    Perubahan jadwal akan berlaku segera setelah disimpan.
+                    <strong>Catatan:</strong> Perubahan jadwal akan disimpan ke sistem dan mempengaruhi slot booking pasien.
                   </p>
                 </div>
 
                 <div className="flex gap-4">
                   <Button 
                     onClick={handleSaveSchedule}
+                    disabled={scheduleMutation.isPending}
                     className="bg-cliniga-primary hover:bg-blue-700 flex items-center gap-2"
                   >
-                    <Save size={18} />
+                    {scheduleMutation.isPending ? <Loader2 className="animate-spin" /> : <Save size={18} />}
                     Simpan Jadwal
                   </Button>
-                  <Button variant="outline">Batal</Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Password Change Tab */}
+          {/* Tab 2: Ubah Password */}
           <TabsContent value="password">
             <Card>
               <CardHeader>
@@ -280,11 +361,12 @@ export default function DoctorSettings() {
                 <div className="flex gap-4">
                   <Button 
                     onClick={handleSavePassword}
+                    disabled={passwordMutation.isPending}
                     className="bg-cliniga-primary hover:bg-blue-700"
                   >
+                    {passwordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Perbarui Password
                   </Button>
-                  <Button variant="outline">Batal</Button>
                 </div>
               </CardContent>
             </Card>

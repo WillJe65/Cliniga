@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from '@/context/AuthContext';
 import DoctorSidebar from '@/components/layout/DoctorSidebar';
 import { Button } from '@/components/ui/button';
@@ -6,50 +7,92 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, Stethoscope, Mail, Phone, MapPin, Building } from 'lucide-react';
+import { ArrowLeft, User, Stethoscope, Mail, Phone, MapPin, Building, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 
 export default function DoctorProfileAccount() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('personal');
+  const [doctorId, setDoctorId] = useState(null);
+
+  // ----------------------------------------------------------------
+  // 1. LOGIC: MENCARI DOCTOR ID & DATA DARI API
+  // ----------------------------------------------------------------
   
-  // Sample doctor data
-  const [doctorData] = useState({
-    id: 'DOC-001',
-    name: 'Dr. Sarah Smith',
-    email: 'sarah.smith@cliniga.com',
-    phone: '+62 812 3456 7890',
-    specialization: 'Spesialis Jantung',
-    licenseNumber: 'STR-12345/2020',
-    hospital: 'Rumah Sakit Pusat Medika',
-    experience: '12 Tahun',
-    bio: 'Dokter berpengalaman dalam menangani penyakit jantung dan kardiovaskular dengan rekam jejak yang baik.'
+  // Cek LocalStorage untuk ID
+  useEffect(() => {
+    if (user?.role === 'doctor') {
+      const profile = localStorage.getItem("cliniga_doctor_profile");
+      if (profile) {
+        try {
+          const parsed = JSON.parse(profile);
+          if (parsed.id) setDoctorId(parsed.id);
+        } catch (e) { console.error(e); }
+      }
+    }
+  }, [user]);
+
+  // Fetch semua dokter untuk mencocokkan profil (karena endpoint profile spesifik belum ada)
+  const { data: doctorsList, isLoading } = useQuery({
+    queryKey: ["/api/doctors"],
   });
 
+  // Cari data dokter yang sedang login
+  const currentDoctor = doctorsList?.find(
+    (d) => d.name === user?.name || d.id === doctorId
+  );
+
+  // ----------------------------------------------------------------
+  // 2. MERGE DATA (API + AUTH + PLACEHOLDER)
+  // ----------------------------------------------------------------
+  
+  const doctorData = {
+    id: currentDoctor?.id ? `DOC-${currentDoctor.id}` : 'DOC-000',
+    name: user?.name || currentDoctor?.name || 'Dr. Unidentified',
+    email: user?.email || 'email@notfound.com', // Dari Auth Context
+    specialization: currentDoctor?.specialization || 'Umum', // Dari API
+    schedule: currentDoctor?.schedule || 'Senin - Jumat', // Dari API
+    
+    
+    phone: '+62 812 3456 7890', 
+    licenseNumber: 'STR-12345/2025',
+    hospital: 'Klinik Utama Cliniga',
+    experience: '5 Tahun',
+    bio: 'Dokter berdedikasi tinggi dalam melayani pasien dengan sepenuh hati sesuai standar medis yang berlaku.'
+  };
+
+  // Data Medis Statis (Belum ada tabelnya di Backend)
   const [medicalInfo] = useState({
     education: [
       {
-        degree: 'Dokter (S1)',
+        degree: 'Dokter Umum (S1)',
         institution: 'Universitas Indonesia',
-        year: 2012
+        year: 2015
       },
       {
-        degree: 'Spesialis Jantung (S2)',
+        degree: `Spesialis ${doctorData.specialization} (S2)`,
         institution: 'Universitas Gadjah Mada',
-        year: 2015
+        year: 2019
       }
     ],
     certifications: [
       'Sertifikat ACLS (American Heart Association)',
-      'Sertifikat BCLS (Basic Cardiac Life Support)',
-      'Sertifikat ECG Interpretation'
+      'Sertifikat Kompetensi IDI',
+      'Surat Tanda Registrasi (STR) Aktif'
     ],
     achievements: [
-      'Best Doctor Award 2022',
-      'Patient Choice Award 2023',
-      'Medical Excellence Recognition 2024'
+      'Dokter Teladan 2023',
+      'Pelayanan Prima Cliniga 2024'
     ]
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen bg-[#F8FAFC] items-center justify-center">
+        <Loader2 className="animate-spin h-10 w-10 text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -89,7 +132,7 @@ export default function DoctorProfileAccount() {
                   {/* Profile Summary */}
                   <div className="flex items-start gap-6 pb-6 border-b">
                     <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center text-cliniga-primary text-3xl font-bold border-4 border-slate-50 shadow-sm">
-                      {doctorData.name.split(' ').map(n => n[0]).join('')}
+                      {doctorData.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
                     </div>
                     <div className="flex-1">
                       <h3 className="text-2xl font-bold text-cliniga-text mb-2">{doctorData.name}</h3>
@@ -103,6 +146,10 @@ export default function DoctorProfileAccount() {
                           <Phone size={16} className="text-cliniga-primary" />
                           {doctorData.phone}
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Building size={16} className="text-cliniga-primary" />
+                          {doctorData.hospital}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -111,33 +158,33 @@ export default function DoctorProfileAccount() {
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="name">Nama Lengkap</Label>
-                      <Input id="name" defaultValue={doctorData.name} disabled className="mt-2" />
+                      <Input id="name" defaultValue={doctorData.name} disabled className="mt-2 bg-slate-50" />
                     </div>
                     <div>
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" defaultValue={doctorData.email} disabled className="mt-2" />
+                      <Input id="email" defaultValue={doctorData.email} disabled className="mt-2 bg-slate-50" />
                     </div>
                     <div>
                       <Label htmlFor="phone">Nomor Telepon</Label>
-                      <Input id="phone" defaultValue={doctorData.phone} disabled className="mt-2" />
+                      <Input id="phone" defaultValue={doctorData.phone} disabled className="mt-2 bg-slate-50" />
                     </div>
                     <div>
                       <Label htmlFor="specialization">Spesialisasi</Label>
-                      <Input id="specialization" defaultValue={doctorData.specialization} disabled className="mt-2" />
+                      <Input id="specialization" defaultValue={doctorData.specialization} disabled className="mt-2 bg-slate-50" />
                     </div>
                     <div>
                       <Label htmlFor="license">Nomor Lisensi</Label>
-                      <Input id="license" defaultValue={doctorData.licenseNumber} disabled className="mt-2" />
+                      <Input id="license" defaultValue={doctorData.licenseNumber} disabled className="mt-2 bg-slate-50" />
                     </div>
                     <div>
                       <Label htmlFor="experience">Pengalaman</Label>
-                      <Input id="experience" defaultValue={doctorData.experience} disabled className="mt-2" />
+                      <Input id="experience" defaultValue={doctorData.experience} disabled className="mt-2 bg-slate-50" />
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="hospital">Rumah Sakit / Klinik</Label>
-                    <Input id="hospital" defaultValue={doctorData.hospital} disabled className="mt-2" />
+                    <Input id="hospital" defaultValue={doctorData.hospital} disabled className="mt-2 bg-slate-50" />
                   </div>
 
                   <div>
@@ -146,14 +193,13 @@ export default function DoctorProfileAccount() {
                       id="bio" 
                       defaultValue={doctorData.bio} 
                       disabled 
-                      className="mt-2 w-full p-3 border border-slate-200 rounded-lg text-sm"
+                      className="mt-2 w-full p-3 border border-slate-200 rounded-lg text-sm bg-slate-50"
                       rows="4"
                     />
                   </div>
 
                   <div className="flex gap-4">
-                    <Button className="bg-cliniga-primary hover:bg-blue-700">Ubah Informasi</Button>
-                    <Button variant="outline">Batal</Button>
+                    <Button className="bg-cliniga-primary hover:bg-blue-700" disabled>Ubah Informasi (Segera)</Button>
                   </div>
                 </CardContent>
               </Card>

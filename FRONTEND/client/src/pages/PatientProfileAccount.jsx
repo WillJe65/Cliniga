@@ -1,21 +1,43 @@
-import React, { useState } from 'react';
-import { User, Mail, Phone, MapPin, Edit2, Save, X, ArrowLeft, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useMutation } from "@tanstack/react-query";
+import { User, Mail, Phone, MapPin, Edit2, Save, X, ArrowLeft, Settings, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from "@/hooks/use-toast";
 import PatientSidebar from '@/components/layout/PatientSidebar';
 
 const PatientProfileAccount = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+
+  // Initial State kosong dulu, nanti diisi useEffect
   const [formData, setFormData] = useState({
-    name: user?.name || 'Alliyah Salsabilla',
-    email: user?.email || 'alliyah@example.com',
-    phone: '08123456789',
-    address: 'Jl. Merdeka No. 123, Jakarta Selatan',
-    dateOfBirth: '1995-08-15',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    dateOfBirth: '',
     bloodType: 'O+',
-    emergencyContact: '08987654321',
+    emergencyContact: '',
   });
+
+  // 1. POPULASI DATA DARI AUTH CONTEXT
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        // Field di bawah ini diasumsikan ada di object user. 
+        // Jika backend belum kirim, akan default ke string kosong.
+        phone: user.phone || '',
+        address: user.address || '',
+        dateOfBirth: user.date_of_birth || '', 
+        bloodType: user.blood_type || 'O+',
+        emergencyContact: user.emergency_contact || '',
+      });
+    }
+  }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,9 +47,51 @@ const PatientProfileAccount = () => {
     }));
   };
 
+  // 2. MUTATION: UPDATE PROFILE
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      // Endpoint ini harus dibuat di backend (misal: di auth.py atau patients.py)
+      const response = await fetch(`/api/patients/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: user?.id,
+          ...data
+        }),
+      });
+
+      // Simulasi sukses jika endpoint belum ada (biar UI tidak stuck)
+      if (response.status === 404) {
+        console.warn("Endpoint /api/patients/profile belum tersedia di backend.");
+        // Throw error agar masuk ke onError dan user tau
+        throw new Error("Backend endpoint belum tersedia (404)");
+      }
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Gagal mengupdate profil");
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Berhasil",
+        description: "Profil Anda berhasil diperbarui.",
+      });
+      setIsEditing(false);
+      // Idealnya disini kita refresh user context, tapi untuk sekarang cukup tutup edit mode
+    },
+    onError: (error) => {
+      toast({
+        title: "Gagal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSave = () => {
-    // TODO: Save to backend
-    setIsEditing(false);
+    updateProfileMutation.mutate(formData);
   };
 
   return (
@@ -69,11 +133,11 @@ const PatientProfileAccount = () => {
           <div className="bg-white rounded-2xl p-8 border border-gray-100">
             {/* Profile Header */}
             <div className="flex items-center gap-6 pb-8 border-b border-gray-100 mb-8">
-              <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl font-bold">
-                {formData.name.charAt(0)}
+              <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl font-bold uppercase">
+                {formData.name ? formData.name.charAt(0) : "U"}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">{formData.name}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{formData.name || "User"}</h3>
                 <p className="text-gray-500 text-sm">{formData.email}</p>
               </div>
             </div>
@@ -108,8 +172,8 @@ const PatientProfileAccount = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    disabled={!isEditing}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-200 disabled:bg-gray-50 disabled:text-gray-500"
+                    disabled={true} // Email biasanya tidak boleh diganti sembarangan
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 disabled:bg-gray-100 disabled:text-gray-500 cursor-not-allowed"
                   />
                 </div>
 
@@ -125,6 +189,7 @@ const PatientProfileAccount = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     disabled={!isEditing}
+                    placeholder="Contoh: 08123456789"
                     className="w-full px-4 py-2 rounded-lg border border-gray-200 disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>
@@ -205,6 +270,7 @@ const PatientProfileAccount = () => {
               <div className="flex gap-3 mt-8 pt-6 border-t border-gray-100">
                 <button
                   onClick={() => setIsEditing(false)}
+                  disabled={updateProfileMutation.isPending}
                   className="flex-1 px-4 py-2.5 border border-gray-200 bg-white text-gray-600 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
                 >
                   <X size={16} />
@@ -212,10 +278,17 @@ const PatientProfileAccount = () => {
                 </button>
                 <button
                   onClick={handleSave}
+                  disabled={updateProfileMutation.isPending}
                   className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
                 >
-                  <Save size={16} />
-                  Simpan Perubahan
+                  {updateProfileMutation.isPending ? (
+                    <Loader2 className="animate-spin h-4 w-4" />
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Simpan Perubahan
+                    </>
+                  )}
                 </button>
               </div>
             )}

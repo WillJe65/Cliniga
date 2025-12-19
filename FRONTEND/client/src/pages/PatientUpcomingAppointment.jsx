@@ -1,30 +1,18 @@
 import React, { useState } from 'react';
-import { Clock, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Clock, RotateCw, Trash2, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'wouter';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import PatientSidebar from '@/components/layout/PatientSidebar';
+import { format, parseISO } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 
 const PatientUpcomingAppointment = () => {
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      doctor: "Dr. Sarah Smith",
-      specialty: "Cardiology",
-      date: "20 Dec 2025",
-      time: "10:00 AM",
-      status: "waiting",
-      statusLabel: "Menunggu Konfirmasi Dokter"
-    },
-    {
-      id: 2,
-      doctor: "Dr. Michael Johnson",
-      specialty: "Dermatology",
-      date: "25 Dec 2025",
-      time: "02:00 PM",
-      status: "confirmed",
-      statusLabel: "Terkonfirmasi"
-    }
-  ]);
-
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleData, setRescheduleData] = useState({
@@ -32,67 +20,118 @@ const PatientUpcomingAppointment = () => {
     newTime: ''
   });
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'waiting':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-100';
-      case 'confirmed':
-        return 'bg-green-50 text-green-700 border-green-100';
-      case 'cancelled':
-        return 'bg-red-50 text-red-700 border-red-100';
-      default:
-        return 'bg-gray-50 text-gray-700 border-gray-100';
-    }
-  };
+  // 1. FETCH APPOINTMENTS (Mendatang)
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: [`/api/appointments/filter?patient_id=${user?.id}&upcoming=true`],
+    enabled: !!user?.id,
+  });
 
-  const getStatusIcon = (status) => {
-    switch(status) {
-      case 'waiting':
-        return <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse"></div>;
-      case 'confirmed':
-        return <div className="w-2.5 h-2.5 bg-green-400 rounded-full"></div>;
-      default:
-        return <div className="w-2.5 h-2.5 bg-gray-400 rounded-full"></div>;
-    }
-  };
+  const rawAppointments = responseData?.appointments || [];
 
+  // Filter tambahan di client side (opsional, jika ingin sembunyikan yang completed)
+  const appointments = rawAppointments.filter(apt => apt.status !== 'completed');
+
+  // 2. MUTATION: UPDATE APPOINTMENT (Cancel / Reschedule)
+  const updateMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await fetch("/api/appointments/edit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Gagal mengupdate janji temu");
+      }
+      return await response.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      
+      const isReschedule = variables.appointment_date; // Cek apakah ini aksi reschedule
+      
+      toast({
+        title: isReschedule ? "Permintaan Terkirim" : "Status Diperbarui",
+        description: isReschedule 
+          ? "Permintaan jadwal baru telah dikirim ke dokter." 
+          : "Janji temu telah dibatalkan.",
+      });
+
+      setShowRescheduleModal(false);
+      setRescheduleData({ newDate: '', newTime: '' });
+      setSelectedAppointment(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Gagal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Action: Batalkan
   const handleCancelAppointment = (id) => {
     if (confirm('Apakah Anda yakin ingin membatalkan janji temu ini?')) {
-      setAppointments(appointments.map(apt => 
-        apt.id === id ? { ...apt, status: 'cancelled', statusLabel: 'Dibatalkan' } : apt
-      ));
-      alert('Janji temu telah dibatalkan');
+      updateMutation.mutate({
+        appointment_id: id,
+        status: 'cancelled'
+      });
     }
   };
 
+  // Action: Reschedule (Buka Modal)
   const handleReschedule = (apt) => {
     setSelectedAppointment(apt);
     setShowRescheduleModal(true);
   };
 
+  // Action: Submit Reschedule
   const handleSubmitReschedule = () => {
     if (!rescheduleData.newDate || !rescheduleData.newTime) {
-      alert('Mohon lengkapi tanggal dan jam baru');
+      toast({ title: "Data tidak lengkap", description: "Isi tanggal dan jam baru.", variant: "destructive" });
       return;
     }
 
-    setAppointments(appointments.map(apt => 
-      apt.id === selectedAppointment.id 
-        ? { 
-            ...apt, 
-            date: rescheduleData.newDate,
-            time: rescheduleData.newTime,
-            status: 'waiting',
-            statusLabel: 'Menunggu Konfirmasi Dokter'
-          } 
-        : apt
-    ));
-
-    setShowRescheduleModal(false);
-    setRescheduleData({ newDate: '', newTime: '' });
-    setSelectedAppointment(null);
-    alert('Permintaan penjadwalan ulang telah dikirim. Menunggu konfirmasi dari dokter.');
+    updateMutation.mutate({
+      appointment_id: selectedAppointment.id,
+      appointment_date: rescheduleData.newDate,
+      appointment_time: rescheduleData.newTime,
+      status: 'pending' // Reset ke pending agar dokter konfirmasi ulang
+    });
   };
+
+  // Helpers UI
+  const getStatusLabel = (status) => {
+    switch(status) {
+      case 'pending': return 'Menunggu Konfirmasi';
+      case 'confirmed': return 'Terkonfirmasi';
+      case 'cancelled': return 'Dibatalkan';
+      case 'completed': return 'Selesai';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      case 'confirmed': return 'bg-green-50 text-green-700 border-green-100';
+      case 'cancelled': return 'bg-red-50 text-red-700 border-red-100';
+      default: return 'bg-gray-50 text-gray-700 border-gray-100';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch(status) {
+      case 'pending': return <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse"></div>;
+      case 'confirmed': return <div className="w-2.5 h-2.5 bg-green-400 rounded-full"></div>;
+      case 'cancelled': return <div className="w-2.5 h-2.5 bg-red-400 rounded-full"></div>;
+      default: return <div className="w-2.5 h-2.5 bg-gray-400 rounded-full"></div>;
+    }
+  };
+
+  const formatTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : "-";
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -111,12 +150,16 @@ const PatientUpcomingAppointment = () => {
           </div>
           
           <div className="space-y-4">
-            {appointments.length === 0 ? (
+            {isLoading ? (
+               <div className="text-center py-12 flex justify-center items-center gap-2 text-gray-500">
+                 <Loader2 className="animate-spin" /> Memuat jadwal...
+               </div>
+            ) : appointments.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 border border-gray-100 text-center">
                 <Clock size={48} className="mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-bold text-gray-900">Tidak ada janji temu</h3>
-                <p className="text-gray-600 mt-2">Anda tidak memiliki janji temu yang dijadwalkan</p>
-                <Link href="/patient-book">
+                <p className="text-gray-600 mt-2">Anda tidak memiliki janji temu mendatang</p>
+                <Link href="/book-appointment">
                   <a className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition">
                     Buat Janji Baru
                   </a>
@@ -130,50 +173,52 @@ const PatientUpcomingAppointment = () => {
                       {/* Status Badge */}
                       <div className={`flex items-center gap-2 inline-flex px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-wider mb-4 ${getStatusColor(apt.status)}`}>
                         {getStatusIcon(apt.status)}
-                        <span>{apt.statusLabel}</span>
+                        <span>{getStatusLabel(apt.status)}</span>
                       </div>
 
                       {/* Doctor Info */}
                       <div className="mb-4">
-                        <h3 className="font-bold text-lg text-gray-900">{apt.doctor}</h3>
-                        <p className="text-sm text-gray-600">{apt.specialty}</p>
+                        <h3 className="font-bold text-lg text-gray-900">{apt.doctor_name}</h3>
+                        <p className="text-sm text-gray-600">{apt.doctor_specialization || "Dokter Umum"}</p>
                       </div>
 
                       {/* Date & Time */}
                       <div className="flex gap-6">
                         <div>
                           <p className="text-xs text-gray-500 font-semibold uppercase">Tanggal</p>
-                          <p className="text-sm font-bold text-gray-900">{apt.date}</p>
+                          <p className="text-sm font-bold text-gray-900">
+                            {apt.appointment_date ? format(parseISO(apt.appointment_date), "d MMM yyyy", { locale: idLocale }) : "-"}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 font-semibold uppercase">Jam</p>
-                          <p className="text-sm font-bold text-gray-900">{apt.time}</p>
+                          <p className="text-sm font-bold text-gray-900">{formatTime(apt.appointment_time)}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    {apt.status !== 'cancelled' && (
+                    {apt.status !== 'cancelled' ? (
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={() => handleReschedule(apt)}
-                          className="px-4 py-2.5 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition flex items-center gap-2 whitespace-nowrap"
+                          disabled={updateMutation.isPending}
+                          className="px-4 py-2.5 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                         >
                           <RotateCw size={16} />
                           Reschedule
                         </button>
                         <button
                           onClick={() => handleCancelAppointment(apt.id)}
-                          className="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition flex items-center gap-2 whitespace-nowrap"
+                          disabled={updateMutation.isPending}
+                          className="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                         >
                           <Trash2 size={16} />
                           Batalkan
                         </button>
                       </div>
-                    )}
-
-                    {apt.status === 'cancelled' && (
-                      <div className="px-4 py-2.5 bg-gray-50 text-gray-600 rounded-xl font-bold">
+                    ) : (
+                      <div className="px-4 py-2.5 bg-gray-50 text-gray-600 rounded-xl font-bold opacity-70">
                         Dibatalkan
                       </div>
                     )}
@@ -185,11 +230,11 @@ const PatientUpcomingAppointment = () => {
 
           {/* Reschedule Modal */}
           {showRescheduleModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
               <div className="bg-white rounded-2xl p-8 max-w-md w-full">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Penjadwalan Ulang Janji Temu</h3>
                 <p className="text-sm text-gray-600 mb-6">
-                  Dokter: <strong>{selectedAppointment?.doctor}</strong>
+                  Dokter: <strong>{selectedAppointment?.doctor_name}</strong>
                 </p>
 
                 <div className="space-y-4 mb-6">
@@ -224,15 +269,17 @@ const PatientUpcomingAppointment = () => {
                       setShowRescheduleModal(false);
                       setRescheduleData({ newDate: '', newTime: '' });
                     }}
+                    disabled={updateMutation.isPending}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition"
                   >
                     Batal
                   </button>
                   <button
                     onClick={handleSubmitReschedule}
-                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
+                    disabled={updateMutation.isPending}
+                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
                   >
-                    Kirim Permintaan
+                    {updateMutation.isPending ? <Loader2 className="animate-spin h-4 w-4"/> : "Kirim Permintaan"}
                   </button>
                 </div>
               </div>

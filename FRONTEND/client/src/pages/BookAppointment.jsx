@@ -12,9 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, ArrowRight, Calendar as CalendarIcon, Check, Clock, Loader2, Stethoscope, User } from "lucide-react";
-import { format, addDays, isBefore, startOfToday } from "date-fns";
+import { format, isBefore, startOfToday } from "date-fns";
+import { convertTo24Hour } from "@/lib/utils";
 
 const timeSlots = [
   "09:00 AM",
@@ -49,7 +50,7 @@ export default function BookAppointment() {
   useEffect(() => {
     const doctorId = new URLSearchParams(search).get("doctor");
     if (doctorId && doctors.length > 0) {
-      const doctor = doctors.find((d) => d.id === doctorId);
+      const doctor = doctors.find((d) => d.id === parseInt(doctorId)); // Pastikan tipe data cocok (Int/String)
       if (doctor) {
         setSelectedDoctor(doctor);
         setCurrentStep("datetime");
@@ -59,32 +60,51 @@ export default function BookAppointment() {
 
   const bookMutation = useMutation({
     mutationFn: async () => {
+      // 1. Validasi Input
       if (!selectedDoctor || !selectedDate || !selectedTime || !user) {
         throw new Error("Missing required booking information");
       }
-      await apiRequest("POST", "/api/appointments", {
-        patientId: user.id,
-        patientName: user.name,
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        specialization: selectedDoctor.specialization,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        time: selectedTime,
-        status: "confirmed",
+
+      // 2. Konversi Jam UI (AM/PM) ke Format Backend (24H)
+      const formattedTime = convertTo24Hour(selectedTime);
+
+      // 3. Kirim ke Endpoint Backend Python
+      const response = await fetch("/api/appointments/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patient_id: user.id,             // snake_case
+          doctor_id: selectedDoctor.id,    // snake_case
+          appointment_date: format(selectedDate, "yyyy-MM-dd"),
+          appointment_time: formattedTime  // Format 14:00
+        }),
       });
+
+      const data = await response.json();
+
+      // 4. Cek Error dari Backend
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal booking");
+      }
+      
+      return data;
     },
+    // 5. Jika Sukses:
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); // Refresh data di dashboard
       toast({
         title: "Appointment booked!",
         description: "Your appointment has been scheduled successfully.",
       });
-      setLocation("/dashboard");
+      setLocation("/dashboard"); // Pindah halaman
     },
-    onError: () => {
+    // 6. Jika Gagal:
+    onError: (error) => {
       toast({
         title: "Booking failed",
-        description: "Unable to book appointment. Please try again.",
+        description: error.message || "Unable to book appointment. Please try again.",
         variant: "destructive",
       });
     },
@@ -140,8 +160,12 @@ export default function BookAppointment() {
                 Back to Dashboard
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-book-title">Book an Appointment</h1>
-            <p className="mt-2 text-muted-foreground">Schedule your visit in just a few steps</p>
+            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-book-title">
+              Book an Appointment
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Schedule your visit in just a few steps
+            </p>
           </div>
 
           <div className="mb-8">
@@ -149,13 +173,31 @@ export default function BookAppointment() {
               {steps.map((step, index) => (
                 <div key={step.id} className="flex flex-1 items-center">
                   <div className="flex flex-col items-center gap-2">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${index <= currentStepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                        index <= currentStepIndex
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
                       <step.icon className="h-5 w-5" />
                     </div>
-                    <span className={`text-xs font-medium ${index <= currentStepIndex ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+                    <span
+                      className={`text-xs font-medium ${
+                        index <= currentStepIndex
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {step.label}
+                    </span>
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`mx-4 h-0.5 flex-1 transition-colors ${index < currentStepIndex ? "bg-primary" : "bg-muted"}`} />
+                    <div
+                      className={`mx-4 h-0.5 flex-1 transition-colors ${
+                        index < currentStepIndex ? "bg-primary" : "bg-muted"
+                      }`}
+                    />
                   )}
                 </div>
               ))}
@@ -166,7 +208,9 @@ export default function BookAppointment() {
             <Card>
               <CardHeader>
                 <CardTitle>Select a Doctor</CardTitle>
-                <CardDescription>Choose from our network of qualified healthcare professionals</CardDescription>
+                <CardDescription>
+                  Choose from our network of qualified healthcare professionals
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -178,7 +222,13 @@ export default function BookAppointment() {
                 ) : (
                   <div className="space-y-4">
                     {doctors.map((doctor) => (
-                      <DoctorCard key={doctor.id} doctor={doctor} selectable selected={selectedDoctor?.id === doctor.id} onBook={() => handleSelectDoctor(doctor)} />
+                      <DoctorCard
+                        key={doctor.id}
+                        doctor={doctor}
+                        selectable
+                        selected={selectedDoctor?.id === doctor.id}
+                        onBook={() => handleSelectDoctor(doctor)}
+                      />
                     ))}
                   </div>
                 )}
@@ -193,7 +243,8 @@ export default function BookAppointment() {
                   <div>
                     <CardTitle>Choose Date & Time</CardTitle>
                     <CardDescription>
-                      Select your preferred appointment slot with Dr. {selectedDoctor.name}
+                      Select your preferred appointment slot with Dr.{" "}
+                      {selectedDoctor.name}
                     </CardDescription>
                   </div>
                   <Button variant="ghost" size="sm" onClick={handleBack}>
@@ -229,10 +280,14 @@ export default function BookAppointment() {
                         {timeSlots.map((time) => (
                           <Button
                             key={time}
-                            variant={selectedTime === time ? "default" : "outline"}
+                            variant={
+                              selectedTime === time ? "default" : "outline"
+                            }
                             size="sm"
                             onClick={() => setSelectedTime(time)}
-                            data-testid={`button-time-${time.replace(/\s+/g, '-').toLowerCase()}`}
+                            data-testid={`button-time-${time
+                              .replace(/\s+/g, "-")
+                              .toLowerCase()}`}
                           >
                             {time}
                           </Button>
@@ -240,14 +295,21 @@ export default function BookAppointment() {
                       </div>
                     ) : (
                       <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                        <p className="text-sm text-muted-foreground">Please select a date first</p>
+                        <p className="text-sm text-muted-foreground">
+                          Please select a date first
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="mt-8 flex justify-end">
-                  <Button onClick={handleSelectDateTime} disabled={!selectedDate || !selectedTime} className="gap-2" data-testid="button-continue-confirm">
+                  <Button
+                    onClick={handleSelectDateTime}
+                    disabled={!selectedDate || !selectedTime}
+                    className="gap-2"
+                    data-testid="button-continue-confirm"
+                  >
                     Continue
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -256,70 +318,111 @@ export default function BookAppointment() {
             </Card>
           )}
 
-          {currentStep === "confirm" && selectedDoctor && selectedDate && selectedTime && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Confirm Your Appointment</CardTitle>
-                    <CardDescription>Review your appointment details before confirming</CardDescription>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={handleBack}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Change Time
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="rounded-lg bg-muted/50 p-6">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarFallback className="bg-primary/10 text-primary text-lg">{getInitials(selectedDoctor.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-1">
-                        <h3 className="text-lg font-semibold">Dr. {selectedDoctor.name}</h3>
-                        <Badge variant="secondary">{selectedDoctor.specialization}</Badge>
-                      </div>
+          {currentStep === "confirm" &&
+            selectedDoctor &&
+            selectedDate &&
+            selectedTime && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Confirm Your Appointment</CardTitle>
+                      <CardDescription>
+                        Review your appointment details before confirming
+                      </CardDescription>
                     </div>
-
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div className="flex items-center gap-3 rounded-lg bg-background p-4">
-                        <CalendarIcon className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Date</p>
-                          <p className="font-medium" data-testid="text-confirm-date">{format(selectedDate, "EEEE, MMMM d, yyyy")}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 rounded-lg bg-background p-4">
-                        <Clock className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Time</p>
-                          <p className="font-medium" data-testid="text-confirm-time">{selectedTime}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center gap-3 rounded-lg bg-background p-4">
-                      <User className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Patient</p>
-                        <p className="font-medium" data-testid="text-confirm-patient">{user?.name}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={handleBack}>Go Back</Button>
-                    <Button onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending} className="gap-2" data-testid="button-confirm-booking">
-                      {bookMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                      Confirm Appointment
+                    <Button variant="ghost" size="sm" onClick={handleBack}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Change Time
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="rounded-lg bg-muted/50 p-6">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-16 w-16">
+                          <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                            {getInitials(selectedDoctor.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-1">
+                          <h3 className="text-lg font-semibold">
+                            Dr. {selectedDoctor.name}
+                          </h3>
+                          <Badge variant="secondary">
+                            {selectedDoctor.specialization}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div className="flex items-center gap-3 rounded-lg bg-background p-4">
+                          <CalendarIcon className="h-5 w-5 text-primary" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Date
+                            </p>
+                            <p
+                              className="font-medium"
+                              data-testid="text-confirm-date"
+                            >
+                              {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 rounded-lg bg-background p-4">
+                          <Clock className="h-5 w-5 text-primary" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Time
+                            </p>
+                            <p
+                              className="font-medium"
+                              data-testid="text-confirm-time"
+                            >
+                              {selectedTime}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-3 rounded-lg bg-background p-4">
+                        <User className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Patient
+                          </p>
+                          <p
+                            className="font-medium"
+                            data-testid="text-confirm-patient"
+                          >
+                            {user?.name}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                      <Button variant="outline" onClick={handleBack}>
+                        Go Back
+                      </Button>
+                      <Button
+                        onClick={() => bookMutation.mutate()}
+                        disabled={bookMutation.isPending}
+                        className="gap-2"
+                        data-testid="button-confirm-booking"
+                      >
+                        {bookMutation.isPending && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        Confirm Appointment
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
         </div>
       </main>
 

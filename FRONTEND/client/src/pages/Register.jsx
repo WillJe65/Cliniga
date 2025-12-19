@@ -39,16 +39,22 @@ export default function Register() {
   const onSubmit = async (data) => {
     setIsLoading(true);
     try {
+      // Memanggil fungsi register di AuthContext yang terhubung ke API /api/auth/register
       await registerUser(data.name, data.email, data.password, data.role);
+      
       toast({
-        title: "Akun berhasil dibuat!",
-        description: "Selamat datang di Cliniga. Akun Anda telah berhasil dibuat.",
+        title: "Registrasi Berhasil!",
+        description: "Akun Anda telah dibuat. Silakan masuk untuk melanjutkan.",
       });
-      setLocation("/dashboard");
+      
+      // PENTING: Redirect ke LOGIN, bukan Dashboard
+      // Karena backend mengharuskan login manual untuk dapat token
+      setLocation("/login");
+      
     } catch (error) {
       toast({
-        title: "Pendaftaran gagal",
-        description: error instanceof Error ? error.message : "Silakan coba lagi.",
+        title: "Pendaftaran Gagal",
+        description: error instanceof Error ? error.message : "Terjadi kesalahan sistem.",
         variant: "destructive",
       });
     } finally {
@@ -72,21 +78,21 @@ export default function Register() {
 
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Buat akun</CardTitle>
+          <CardTitle className="text-2xl font-bold">Buat Akun Baru</CardTitle>
           <CardDescription>
-            Bergabunglah dengan Cliniga untuk mesan janji temu dan kelola kesehatan Anda
+            Bergabunglah dengan Cliniga untuk layanan kesehatan yang lebih baik
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
-                <Label>Saya seorang</Label>
+                <Label>Saya mendaftar sebagai</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     type="button"
                     variant={selectedRole === "patient" ? "default" : "outline"}
-                    className="h-auto flex-col gap-2 py-4"
+                    className={`h-auto flex-col gap-2 py-4 ${selectedRole === "patient" ? "border-primary bg-primary/10 text-primary hover:bg-primary/20" : ""}`}
                     onClick={() => handleRoleChange("patient")}
                     data-testid="button-role-patient"
                   >
@@ -96,7 +102,7 @@ export default function Register() {
                   <Button
                     type="button"
                     variant={selectedRole === "doctor" ? "default" : "outline"}
-                    className="h-auto flex-col gap-2 py-4"
+                    className={`h-auto flex-col gap-2 py-4 ${selectedRole === "doctor" ? "border-primary bg-primary/10 text-primary hover:bg-primary/20" : ""}`}
                     onClick={() => handleRoleChange("doctor")}
                     data-testid="button-role-doctor"
                   >
@@ -133,7 +139,7 @@ export default function Register() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="Masukkan email Anda"
+                        placeholder="Masukkan email aktif"
                         {...field}
                         data-testid="input-email"
                       />
@@ -152,7 +158,7 @@ export default function Register() {
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="Buat kata sandi (minimal 6 karakter)"
+                        placeholder="Minimal 6 karakter"
                         {...field}
                         data-testid="input-password"
                       />
@@ -168,8 +174,14 @@ export default function Register() {
                 disabled={isLoading}
                 data-testid="button-submit-register"
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Buat Akun
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Mendaftarkan...
+                  </>
+                ) : (
+                  "Buat Akun"
+                )}
               </Button>
             </form>
           </Form>
@@ -181,7 +193,7 @@ export default function Register() {
               className="font-medium text-primary hover:underline"
               data-testid="link-login"
             >
-              Masuk
+              Masuk di sini
             </Link>
           </div>
         </CardContent>
