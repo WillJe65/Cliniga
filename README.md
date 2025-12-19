@@ -12,7 +12,7 @@
 | **M. Royhan Alfitra** | 123140146 | Frontend Developer |
 | **Alliyah Salsabilla** | 123140014 | Frontend Developer |
 | **Afifa Aulia** | 123140073 | Frontend Developer |
-| **I Gede Krisna Yoga Saputra** | 123140163 | Database Specialist |
+| **I Gede Krisna Yoga Saputra** | 123140163 | Database Developer |
 
 ---
 
