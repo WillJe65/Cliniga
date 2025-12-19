@@ -69,6 +69,8 @@ npm install # Mengunduh semua library yang diperlukan
 npm run dev
 
 ```
+### **4. Akses aplikasi melalui browser**
+Akses aplikasi melalui browser di: http://localhost:5173
 
 ---
 
