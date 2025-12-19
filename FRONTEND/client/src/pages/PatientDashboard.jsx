@@ -12,7 +12,7 @@ const PatientDashboard = () => {
   // 1. FETCH APPOINTMENTS UNTUK STATISTIK
   const { data: responseData, isLoading } = useQuery({
     queryKey: [`/api/appointments/filter?patient_id=${user?.id}`],
-    enabled: !!user?.id, // Hanya jalan jika user sudah login
+    enabled: !!user?.id, 
   });
 
   const appointments = responseData?.appointments || [];

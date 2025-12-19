@@ -56,7 +56,7 @@ export default function DoctorIncomingAppointments() {
   // 3. FILTER & MAPPING DATA
   // ----------------------------------------------------------------
   
-  // Hanya ambil status yang relevan untuk "Incoming" (Pending & Confirmed)
+  //  ambil status yang relevan untuk "Incoming" (Pending & Confirmed)
   const incomingAppointments = allAppointments.filter(apt => 
     apt.status === 'pending' || apt.status === 'confirmed'
   );
@@ -64,7 +64,7 @@ export default function DoctorIncomingAppointments() {
   // Helper Translate Status API -> UI
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'confirmed': return 'Diperiksa'; // Atau "Dikonfirmasi"
+      case 'confirmed': return 'Diperiksa'; 
       case 'pending': return 'Menunggu';
       default: return status;
     }
@@ -88,9 +88,9 @@ export default function DoctorIncomingAppointments() {
 
   const getStatusBadge = (status) => {
     switch(status) {
-      case 'pending': // Menunggu
+      case 'pending': 
         return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'confirmed': // Diperiksa
+      case 'confirmed': 
         return 'bg-blue-100 text-blue-700 border-blue-200';
       default:
         return 'bg-slate-100 text-slate-600 border-slate-200';

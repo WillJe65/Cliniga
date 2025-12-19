@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { AppointmentCard } from "@/components/appointments/AppointmentCard";
-// PERBAIKAN DI SINI: Hapus kurung kurawal { } karena ini default export
 import MedicalRecordModal from "@/components/modals/MedicalRecordModal"; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,18 +28,14 @@ export default function Dashboard() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [recordModalOpen, setRecordModalOpen] = useState(false);
   
-  // State untuk menyimpan ID Dokter (Khusus jika user adalah dokter)
+  // State untuk menyimpan ID Dokter 
   const [doctorId, setDoctorId] = useState(null);
 
-  // 1. Logic Khusus Dokter: Kita harus cari tahu Doctor ID dia berapa
-  // (Karena User ID beda dengan Doctor ID di tabel database)
+  // 1. Logic Doctor
   useEffect(() => {
     if (user?.role === 'doctor') {
-        // Coba ambil dari LocalStorage jika ada (dari login)
         const profile = localStorage.getItem("cliniga_doctor_profile");
         if (profile) {
-            // WARNING: Pastikan backend login sudah kirim ID. 
-            // Jika belum, kita pakai fallback fetch list dokter.
             try {
                 const parsed = JSON.parse(profile);
                 if(parsed.id) setDoctorId(parsed.id);
@@ -51,7 +46,7 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // Jika Doctor ID belum ketemu di localstorage, kita fetch manual (Fallback)
+  // Jika Doctor ID belum ketemu di localstorage, fetch manual (Fallback)
   const { data: doctorsList } = useQuery({
     queryKey: ["/api/doctors"],
     enabled: user?.role === 'doctor' && !doctorId 
@@ -84,7 +79,7 @@ export default function Dashboard() {
     enabled: !!apiEndpoint // Hanya jalan jika endpoint sudah valid
   });
 
-  // Backend Python membungkus array dalam key 'appointments'
+  // Backend Python array dalam key 'appointments'
   const appointments = responseData?.appointments || [];
 
   // 3. MUTATION: Tambah Rekam Medis
@@ -95,10 +90,9 @@ export default function Dashboard() {
       notes,
     }) => {
       await apiRequest("POST", "/api/medical-records/create", {
-        appointment_id: appointmentId, // snake_case
+        appointment_id: appointmentId, 
         diagnosis,
         notes,
-        // Backend handle createdAt otomatis
       });
     },
     onSuccess: () => {
@@ -132,17 +126,16 @@ export default function Dashboard() {
     });
   };
 
-  // 4. Client-Side Filtering untuk Tab (Today, Upcoming, History)
-  // Kita filter hasil dari API agar masuk ke kotak yang benar
+  // 4. Client-Side Filtering untuk Tab 
   const todayAppointments = appointments.filter((apt) => {
-    // Backend kirim format YYYY-MM-DD. Bandingkan string langsung lebih aman.
+    // Backend kirim format YYYY-MM-DD..
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     return apt.appointment_date === todayStr && apt.status !== "cancelled";
   });
 
   const upcomingAppointments = appointments.filter((apt) => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    // Ambil yang tanggalnya > hari ini ATAU (hari ini tapi status pending/confirmed)
+    // Ambil yang tanggalnya > hari ini ATAU ( status pending/confirmed)
     return (apt.appointment_date >= todayStr) && apt.status !== "cancelled" && apt.status !== "completed";
   });
 

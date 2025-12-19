@@ -10,8 +10,6 @@ class MedicalRecordViews:
     # =======================================================
     # 1. LIHAT REKAM MEDIS (KHUSUS PASIEN)
     # =======================================================
-    # Mengambil data berdasarkan appointment_id
-    # Flow: Pasien klik detail appointment -> Muncul hasil diagnosa
     @view_config(route_name='get_medical_record', request_method='GET')
     def get_medical_record(self):
         appointment_id = self.request.params.get('appointment_id')
@@ -42,7 +40,6 @@ class MedicalRecordViews:
     # =======================================================
     # 2. RIWAYAT KESEHATAN LENGKAP (OPSIONAL)
     # =======================================================
-    # Mengambil semua rekam medis milik satu pasien tertentu
     @view_config(route_name='get_patient_history', request_method='GET')
     def get_patient_history(self):
         patient_id = self.request.params.get('patient_id')
@@ -72,7 +69,6 @@ class MedicalRecordViews:
     # =======================================================
     # 3. BUAT REKAM MEDIS (KHUSUS DOKTER)
     # =======================================================
-    # Fitur ini wajib ada agar data bisa masuk (sesuai diagram "FROM DOCTOR")
     @view_config(route_name='create_medical_record', request_method='POST')
     def create_medical_record(self):
         data = self.request.json_body
@@ -102,7 +98,7 @@ class MedicalRecordViews:
             )
             DBSession.add(new_record)
             
-            # Update status appointment jadi 'completed' otomatis (Opsional logika bisnis)
+            # Update status appointment jadi 'completed' otomatis
             appt.status = 'completed'
             
             DBSession.flush()

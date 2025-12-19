@@ -47,8 +47,6 @@ export default function Register() {
         description: "Akun Anda telah dibuat. Silakan masuk untuk melanjutkan.",
       });
       
-      // PENTING: Redirect ke LOGIN, bukan Dashboard
-      // Karena backend mengharuskan login manual untuk dapat token
       setLocation("/login");
       
     } catch (error) {

@@ -59,7 +59,7 @@ const PatientBookAppointment = () => {
       setShowScheduleModal(false);
       setScheduleData({ date: '', time: '', complaint: '' });
       setSelectedDoctor(null);
-      // Redirect ke Dashboard (Opsional)
+      // Redirect ke Dashboard
       setLocation("/patient-dashboard");
     },
     onError: (error) => {
@@ -103,8 +103,6 @@ const PatientBookAppointment = () => {
       doctor_id: selectedDoctor.id,
       appointment_date: scheduleData.date, // Format YYYY-MM-DD dari input type="date"
       appointment_time: scheduleData.time, // Format HH:MM dari input type="time"
-      // Catatan: Backend Anda di 'appointment.py' saat ini belum menyimpan 'complaint' 
-      // di tabel AppointmentModel, tapi kita kirim saja siapa tahu backend diupdate.
       complaint: scheduleData.complaint 
     };
 

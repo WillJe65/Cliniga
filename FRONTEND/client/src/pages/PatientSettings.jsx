@@ -33,12 +33,11 @@ const PatientSettings = () => {
   // MUTATION: GANTI PASSWORD
   const changePasswordMutation = useMutation({
     mutationFn: async (data) => {
-      // Pastikan endpoint ini ada di backend (misal: auth.py)
       const response = await fetch("/api/account/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user?.email, // Menggunakan email sebagai identifier
+          email: user?.email, 
           current_password: data.currentPassword,
           new_password: data.newPassword
         }),

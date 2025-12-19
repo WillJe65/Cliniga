@@ -11,12 +11,9 @@ class AccountViews:
     # =======================================================
     # 1. LIHAT INFORMASI PEMILIK AKUN & JADWAL (PROFILE)
     # =======================================================
-    # Cocok untuk:
-    # - Pasien: Menu "Informasi pemilik akun"
-    # - Dokter: Menu "Informasi pemilik akun" DAN "Jadwal praktik resmi"
     @view_config(route_name='account_profile', request_method='GET')
     def get_profile(self):
-        # Karena belum ada Middleware JWT, kita ambil user_id dari Query Params
+        # kita ambil user_id dari Query Params
         # Contoh request: GET /api/account/profile?user_id=1
         user_id = self.request.params.get('user_id')
 
@@ -30,7 +27,7 @@ class AccountViews:
             self.request.response.status = 404
             return {'error': 'User tidak ditemukan'}
 
-        # Data dasar (Milik Pasien & Dokter)
+        # Data dasar 
         profile_data = {
             'id': user.id,
             'name': user.name,
@@ -39,12 +36,12 @@ class AccountViews:
             'created_at': str(user.created_at)
         }
 
-        # Jika Dokter, tambahkan data spesialisasi & jadwal
+        #  tambahkan data spesialisasi & jadwal
         if user.role == 'doctor' and user.doctor:
             profile_data['doctor_info'] = {
                 'doctor_id': user.doctor.id,
                 'specialization': user.doctor.specialization,
-                'schedule': user.doctor.schedule  # <--- "Jadwal praktik resmi"
+                'schedule': user.doctor.schedule  
             }
 
         return {'status': 'success', 'data': profile_data}
@@ -52,7 +49,6 @@ class AccountViews:
     # =======================================================
     # 2. UBAH KATA SANDI (SETTING)
     # =======================================================
-    # Cocok untuk: Pasien & Dokter (Menu "Ubah katasandi")
     @view_config(route_name='account_change_password', request_method='PUT')
     def change_password(self):
         data = self.request.json_body
@@ -80,7 +76,7 @@ class AccountViews:
         
         try:
             user.password = hashed_new_pw.decode('utf-8')
-            # DBSession.flush() # Opsional, transaction manager akan handle commit
+            # DBSession.flush() 
             return {'status': 'success', 'message': 'Password berhasil diubah'}
         except Exception as e:
             self.request.response.status = 500
@@ -89,12 +85,11 @@ class AccountViews:
     # =======================================================
     # 3. UBAH JADWAL PRAKTIK (SETTING DOKTER)
     # =======================================================
-    # Cocok untuk: Dokter Saja (Menu "Ubah jadwal praktik resmi")
     @view_config(route_name='account_update_schedule', request_method='PUT')
     def update_schedule(self):
         data = self.request.json_body
         user_id = data.get('user_id')
-        new_schedule = data.get('schedule') # String teks bebas, misal: "Senin-Jumat, 09.00 - 15.00"
+        new_schedule = data.get('schedule') # misal: "Senin-Jumat, 09.00 - 15.00"
 
         if not user_id or not new_schedule:
             self.request.response.status = 400
@@ -112,7 +107,6 @@ class AccountViews:
             return {'error': 'Akses ditolak. Fitur ini hanya untuk Dokter.'}
         
         # Update Jadwal di tabel Doctors
-        # Akses via relationship 'user.doctor'
         if user.doctor:
             user.doctor.schedule = new_schedule
             return {'status': 'success', 'message': 'Jadwal praktik berhasil diperbarui', 'schedule': new_schedule}
@@ -124,8 +118,6 @@ class AccountViews:
     # 4. LOGOUT
     # =======================================================
     # Cocok untuk: Pasien & Dokter
-    # Catatan: Karena JWT-nya masih "mock" (stateless), logout sebenarnya cukup 
-    # dilakukan di React (hapus localStorage). Namun endpoint ini disiapkan 
     # jika nanti ingin menerapkan blacklist token atau session server-side.
     @view_config(route_name='account_logout', request_method='POST')
     def logout(self):

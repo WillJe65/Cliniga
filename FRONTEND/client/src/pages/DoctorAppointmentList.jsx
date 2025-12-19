@@ -8,7 +8,7 @@ import { ArrowLeft, Search, Filter, TrendingUp, CheckCircle, Clock, AlertCircle,
 import { Link } from 'wouter';
 import { useAuth } from "@/context/AuthContext";
 import { format, parseISO } from "date-fns";
-import { id as idLocale } from "date-fns/locale"; // Untuk format tanggal Indonesia
+import { id as idLocale } from "date-fns/locale"; 
 
 export default function DoctorAppointmentList() {
   const { user } = useAuth();
@@ -19,7 +19,6 @@ export default function DoctorAppointmentList() {
   // ----------------------------------------------------------------
   // 1. LOGIC: MENCARI DOCTOR ID DARI USER LOGIN
   // ----------------------------------------------------------------
-  // Cek LocalStorage dulu (siapa tahu login sudah menyimpan profil dokter)
   useEffect(() => {
     if (user?.role === 'doctor') {
       const profile = localStorage.getItem("cliniga_doctor_profile");
@@ -52,7 +51,7 @@ export default function DoctorAppointmentList() {
   // ----------------------------------------------------------------
   const { data: responseData, isLoading } = useQuery({
     queryKey: [`/api/appointments/filter?doctor_id=${doctorId}`],
-    enabled: !!doctorId, // Hanya jalan kalau ID Dokter sudah ketemu
+    enabled: !!doctorId, 
   });
 
   const appointments = responseData?.appointments || [];
@@ -61,11 +60,10 @@ export default function DoctorAppointmentList() {
   // 3. HELPER FUNCTIONS (Status & Format)
   // ----------------------------------------------------------------
   
-  // Mapping Status API (English) -> UI (Indonesia)
   const getStatusLabel = (status) => {
     switch (status) {
       case 'completed': return 'Selesai';
-      case 'confirmed': return 'Masuk'; // Confirmed dianggap pasien sudah masuk jadwal
+      case 'confirmed': return 'Masuk'; 
       case 'pending': return 'Menunggu';
       case 'cancelled': return 'Dibatalkan';
       default: return status;

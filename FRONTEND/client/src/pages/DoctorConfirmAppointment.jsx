@@ -22,7 +22,6 @@ export default function DoctorConfirmAppointment() {
 
   // 2. Fetch Detail Appointment dari API
   const { data: responseData, isLoading: isLoadingData } = useQuery({
-    // Kita fetch endpoint utama lalu cari datanya di client-side
     queryKey: ["/api/appointments"], 
   });
 

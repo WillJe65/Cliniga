@@ -33,7 +33,7 @@ class AuthViews:
         existing_user = DBSession.query(User).filter(User.email == email_input).first()
         
         if existing_user:
-            self.request.response.status = 409 # Conflict
+            self.request.response.status = 409 
             return {'error': 'Email sudah terpakai'}
         
         # 3. Hash Password
@@ -48,12 +48,11 @@ class AuthViews:
                 role=data['role'] 
             )
             DBSession.add(new_user)
-            DBSession.flush() # Dapatkan ID user sebelum commit
+            DBSession.flush() 
 
             # 5. Handle Dokter
             if data['role'] == 'doctor':
                 if 'specialization' not in data:
-                    # Rollback jika data dokter tidak lengkap
                     return {'error': 'Dokter wajib mengisi specialization!'}
                     # Note: transaction otomatis abort jika kita raise error atau return error 400 
                     # tapi manual transaction.abort() juga aman untuk memastikan.
@@ -90,14 +89,13 @@ class AuthViews:
 
         if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
             
-            # 1. Ambil Secret Key
+            # Secret Key
             secret_key = os.getenv("JWT")
             if not secret_key:
                 print("CRITICAL: JWT belum ada di .env")
                 
 
             # 2. Tentukan Kapan Token Expire (Misal: 24 Jam dari sekarang)
-            # Menggunakan timezone UTC agar konsisten
             expiration_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
 
             # 3. Siapkan Isi Tiket (Payload)
@@ -110,7 +108,6 @@ class AuthViews:
             }
 
             # 4. GENERATE TOKEN (Encode)
-            # Payload + Secret = Token String
             token_string = jwt.encode(payload, secret_key, algorithm='HS256')
 
             # 5. Response ke Frontend
@@ -124,7 +121,7 @@ class AuthViews:
             response_data = {
                 'status': 'success',
                 'user': user_data,
-                'token': token_string  # <--- INI SEKARANG TOKEN ASLI
+                'token': token_string
             }
 
             # Tambahan Data Dokter

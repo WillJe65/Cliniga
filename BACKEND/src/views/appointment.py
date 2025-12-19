@@ -25,7 +25,7 @@ class AppointmentViews:
             date_obj = datetime.strptime(data['appointment_date'], '%Y-%m-%d').date()
             time_obj = datetime.strptime(data['appointment_time'], '%H:%M').time()
 
-            # Validasi Waktu (Tidak boleh masa lalu)
+            # Validasi Waktu 
             now = datetime.now()
             if date_obj < date.today() or (date_obj == date.today() and time_obj <= now.time()):
                 self.request.response.status = 400
@@ -75,13 +75,13 @@ class AppointmentViews:
             return {'error': 'Janji temu tidak ditemukan'}
         
         try:
-            # Update Tanggal/Jam (Reschedule)
+            # Update Tanggal/Jam 
             if 'appointment_date' in data:
                 appointment.appointment_date = datetime.strptime(data['appointment_date'], '%Y-%m-%d').date()
             if 'appointment_time' in data:
                 appointment.appointment_time = datetime.strptime(data['appointment_time'], '%H:%M').time()
             
-            # Update Status (Logika Terima/Tolak Dokter)
+            # Update Status
             if 'status' in data:
                 new_status = data['status']
                 current_status = appointment.status
@@ -93,21 +93,21 @@ class AppointmentViews:
                     self.request.response.status = 400
                     return {'error': f'Status tidak valid. Pilihan: {valid_statuses}'}
 
-                # Logika Transisi Status (State Machine)
+                # Logika Transisi Status 
                 
-                # Dokter MENERIMA (Pending -> Confirmed)
+                # Dokter MENERIMA
                 if new_status == 'confirmed':
                     if current_status != 'pending':
                         self.request.response.status = 400
                         return {'error': 'Hanya janji temu "pending" yang bisa dikonfirmasi'}
                 
-                # Dokter MENOLAK / Membatalkan (Pending/Confirmed -> Cancelled)
+                # Dokter MENOLAK / Membatalkan
                 elif new_status == 'cancelled':
                     if current_status == 'completed':
                         self.request.response.status = 400
                         return {'error': 'Janji temu yang sudah selesai tidak bisa dibatalkan'}
                     
-                # Skenario: Dokter Menyelesaikan Tugas (Confirmed -> Completed)
+                # Skenario: Dokter Menyelesaikan Tugas
                 elif new_status == 'completed':
                     if current_status != 'confirmed':
                         self.request.response.status = 400
@@ -149,7 +149,7 @@ class AppointmentViews:
         patient_id = request_params.get('patient_id')
         status = request_params.get('status')
         
-        # Parameter baru: 'upcoming' (true/false)
+        # Parameter baru: 'upcoming'
         is_upcoming = request_params.get('upcoming')
         
         query = DBSession.query(AppointmentModel)
@@ -165,7 +165,7 @@ class AppointmentViews:
             if status:
                 query = query.filter(AppointmentModel.status == status)
             
-            # FITUR BARU: Filter Upcoming (Hanya yang akan datang)
+            # FITUR BARU: Filter Upcoming
             if is_upcoming == 'true':
                 today = date.today()
                 # Ambil yang tanggalnya >= hari ini
@@ -176,13 +176,12 @@ class AppointmentViews:
                     AppointmentModel.appointment_time.asc()
                 )
             else:
-                # Default: Urutkan dari yang terbaru dibuat (opsional)
+                # Default: Urutkan dari yang terbaru dibuat
                 query = query.order_by(AppointmentModel.created_at.desc())
 
             appointments = query.all()
             
-            # Convert ke JSON (Gunakan to_json bawaan model biar rapi)
-            # Pastikan models.py Anda sudah punya method to_json() yang return patient_name
+            # Convert ke JSON
             return {'appointments': [appt.to_json() for appt in appointments]}
             
         except ValueError:

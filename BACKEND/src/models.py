@@ -14,13 +14,8 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_
 from zope.sqlalchemy import register
 
 # =======================================================
-# 1. SETUP KONEKSI KHUSUS PYRAMID (PENTING!)
+# 1. SETUP KONEKSI KHUSUS PYRAMID
 # =======================================================
-# Kita tidak menaruh URL database disini (hardcode), 
-# tapi biarkan __init__.py yang mengaturnya lewat .env / .ini
-
-# Membuat 'DBSession' yang dicari-cari oleh __init__.py
-# Ini adalah "Magic Session" yang otomatis diatur oleh Pyramid
 DBSession = scoped_session(sessionmaker())
 register(DBSession)
 

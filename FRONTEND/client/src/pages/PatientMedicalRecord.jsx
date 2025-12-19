@@ -24,16 +24,15 @@ const PatientMedicalRecord = () => {
   // 2. MAPPING DATA API KE FORMAT UI
   const records = rawAppointments.map((apt) => ({
     id: apt.id,
-    doctor: apt.doctor_name || "Dokter", // Pastikan backend mengirim doctor_name
-    specialty: apt.doctor_specialization || "Umum", // Pastikan backend mengirim ini
+    doctor: apt.doctor_name || "Dokter", 
+    specialty: apt.doctor_specialization || "Umum", 
     date: apt.appointment_date 
       ? format(parseISO(apt.appointment_date), "d MMM yyyy", { locale: idLocale }) 
       : "-",
-    // Field di bawah ini tergantung apakah backend appointment menyertakan data medis (join)
     diagnosis: apt.diagnosis || "Data diagnosa belum tersedia",
     treatment: apt.treatment || "Lihat detail catatan dokter",
     notes: apt.notes || "-",
-    medicines: apt.medicines || [] // Backend perlu mengirim array obat jika ada
+    medicines: apt.medicines || [] 
   }));
 
   const handleViewDetail = (record) => {

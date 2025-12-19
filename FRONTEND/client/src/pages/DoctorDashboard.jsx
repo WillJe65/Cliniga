@@ -58,11 +58,11 @@ function DoctorDashboard() {
   // ----------------------------------------------------------------
   // 3. FILTER & OLAH DATA (Hanya Tampilkan HARI INI)
   // ----------------------------------------------------------------
-  // Mapping status API ke UI Dashboard
+
   const mapStatus = (apiStatus) => {
     switch(apiStatus) {
       case 'completed': return 'Selesai';
-      case 'confirmed': return 'Diperiksa'; // Asumsi: Confirmed = Pasien sudah datang/siap
+      case 'confirmed': return 'Diperiksa'; 
       case 'pending': return 'Menunggu';
       case 'cancelled': return 'Batal';
       default: return 'Menunggu';
@@ -83,7 +83,6 @@ function DoctorDashboard() {
   const stats = {
     total: todayAppointments.length,
     selesai: todayAppointments.filter(p => p.status === 'completed').length,
-    // Pending di Dashboard = Status 'pending' atau 'confirmed'
     pending: todayAppointments.filter(p => p.status === 'pending' || p.status === 'confirmed').length,
     batal: todayAppointments.filter(p => p.status === 'cancelled').length
   };
@@ -100,10 +99,7 @@ function DoctorDashboard() {
   // ----------------------------------------------------------------
   // 4. ACTION HANDLERS
   // ----------------------------------------------------------------
-  
   const handlePeriksaClick = (appointment) => {
-    // Mapping data appointment ke format yang diharapkan modal
-    // Pastikan modal menerima ID Appointment, bukan cuma ID Pasien
     setSelectedPatient({
       ...appointment,
       name: appointment.patient_name, // Modal mungkin butuh prop 'name'
@@ -122,7 +118,7 @@ function DoctorDashboard() {
         body: JSON.stringify({
           appointment_id: parseInt(appointmentId),
           diagnosis: recordData.diagnosis,
-          notes: recordData.notes || recordData.treatment // Gabungkan jika perlu
+          notes: recordData.notes || recordData.treatment 
         }),
       });
       if (!resRecord.ok) throw new Error("Gagal simpan rekam medis");
@@ -141,7 +137,6 @@ function DoctorDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/appointments/filter?doctor_id=${doctorId}`] });
       setIsModalOpen(false);
-      // alert("Rekam medis berhasil disimpan!"); // Gunakan Toast lebih baik jika ada
     },
     onError: (err) => {
       alert("Error: " + err.message);

@@ -28,8 +28,6 @@ const PatientProfileAccount = () => {
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        // Field di bawah ini diasumsikan ada di object user. 
-        // Jika backend belum kirim, akan default ke string kosong.
         phone: user.phone || '',
         address: user.address || '',
         dateOfBirth: user.date_of_birth || '', 
@@ -50,7 +48,6 @@ const PatientProfileAccount = () => {
   // 2. MUTATION: UPDATE PROFILE
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
-      // Endpoint ini harus dibuat di backend (misal: di auth.py atau patients.py)
       const response = await fetch(`/api/patients/profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

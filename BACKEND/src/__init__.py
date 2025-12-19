@@ -6,7 +6,7 @@ from pyramid.events import NewRequest
 import os
 from pyramid.response import Response
 
-# --- [1. FUNGSI CORS MANUAL] ---
+# --- [CORS] ---
 def add_cors_headers_response_callback(event):
     def cors_headers(request, response):
         # Daftar Domain yang Diizinkan
@@ -32,7 +32,7 @@ def add_cors_headers_response_callback(event):
 
     event.request.add_response_callback(cors_headers)
 
-# --- [2. VIEW OPTIONS (PREFLIGHT)] ---
+# --- [VIEW OPTIONS (PREFLIGHT)] ---
 def options_view(request):
     return Response(status=200)
 

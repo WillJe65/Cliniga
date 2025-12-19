@@ -34,9 +34,6 @@ export default function DoctorSettings() {
 
   const [schedule, setSchedule] = useState(defaultSchedule);
 
-  // TODO: Jika nanti Backend sudah support menyimpan JSON jadwal per dokter, 
-  // Anda bisa gunakan useQuery di sini untuk fetch jadwal tersimpan.
-  // Untuk sekarang, kita pakai default state.
 
   const handleScheduleChange = (index, field, value) => {
     const newSchedule = [...schedule];
@@ -58,15 +55,15 @@ export default function DoctorSettings() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          doctor_id: user?.id, // Kirim ID user/dokter
+          doctor_id: user?.id, 
           schedule_data: newSchedule 
         }),
       });
 
-      // Handle response jika endpoint belum ada (Simulasi sukses untuk demo)
+      // Handle response 
       if (response.status === 404) {
         console.warn("Endpoint /api/doctors/schedule belum dibuat di backend.");
-        return; // Anggap sukses di frontend saja
+        return; 
       }
 
       if (!response.ok) {
@@ -136,7 +133,7 @@ export default function DoctorSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user?.email, // Identifikasi user via email
+          email: user?.email, 
           current_password: data.currentPassword,
           new_password: data.newPassword
         }),

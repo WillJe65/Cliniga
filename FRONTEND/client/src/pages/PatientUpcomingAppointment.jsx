@@ -28,7 +28,7 @@ const PatientUpcomingAppointment = () => {
 
   const rawAppointments = responseData?.appointments || [];
 
-  // Filter tambahan di client side (opsional, jika ingin sembunyikan yang completed)
+  // Filter tambahan di client side 
   const appointments = rawAppointments.filter(apt => apt.status !== 'completed');
 
   // 2. MUTATION: UPDATE APPOINTMENT (Cancel / Reschedule)
@@ -49,7 +49,7 @@ const PatientUpcomingAppointment = () => {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       
-      const isReschedule = variables.appointment_date; // Cek apakah ini aksi reschedule
+      const isReschedule = variables.appointment_date; 
       
       toast({
         title: isReschedule ? "Permintaan Terkirim" : "Status Diperbarui",

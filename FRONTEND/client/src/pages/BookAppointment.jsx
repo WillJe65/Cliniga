@@ -50,7 +50,7 @@ export default function BookAppointment() {
   useEffect(() => {
     const doctorId = new URLSearchParams(search).get("doctor");
     if (doctorId && doctors.length > 0) {
-      const doctor = doctors.find((d) => d.id === parseInt(doctorId)); // Pastikan tipe data cocok (Int/String)
+      const doctor = doctors.find((d) => d.id === parseInt(doctorId)); 
       if (doctor) {
         setSelectedDoctor(doctor);
         setCurrentStep("datetime");
@@ -75,10 +75,10 @@ export default function BookAppointment() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          patient_id: user.id,             // snake_case
-          doctor_id: selectedDoctor.id,    // snake_case
+          patient_id: user.id,             
+          doctor_id: selectedDoctor.id,    
           appointment_date: format(selectedDate, "yyyy-MM-dd"),
-          appointment_time: formattedTime  // Format 14:00
+          appointment_time: formattedTime  
         }),
       });
 
@@ -93,12 +93,12 @@ export default function BookAppointment() {
     },
     // 5. Jika Sukses:
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); // Refresh data di dashboard
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] }); 
       toast({
         title: "Appointment booked!",
         description: "Your appointment has been scheduled successfully.",
       });
-      setLocation("/dashboard"); // Pindah halaman
+      setLocation("/dashboard"); 
     },
     // 6. Jika Gagal:
     onError: (error) => {

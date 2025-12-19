@@ -32,7 +32,7 @@ export default function DoctorProfileAccount() {
     }
   }, [user]);
 
-  // Fetch semua dokter untuk mencocokkan profil (karena endpoint profile spesifik belum ada)
+  // Fetch semua dokter untuk mencocokkan profil
   const { data: doctorsList, isLoading } = useQuery({
     queryKey: ["/api/doctors"],
   });
@@ -49,9 +49,9 @@ export default function DoctorProfileAccount() {
   const doctorData = {
     id: currentDoctor?.id ? `DOC-${currentDoctor.id}` : 'DOC-000',
     name: user?.name || currentDoctor?.name || 'Dr. Unidentified',
-    email: user?.email || 'email@notfound.com', // Dari Auth Context
-    specialization: currentDoctor?.specialization || 'Umum', // Dari API
-    schedule: currentDoctor?.schedule || 'Senin - Jumat', // Dari API
+    email: user?.email || 'email@notfound.com', 
+    specialization: currentDoctor?.specialization || 'Umum', 
+    schedule: currentDoctor?.schedule || 'Senin - Jumat', 
     
     
     phone: '+62 812 3456 7890', 
@@ -61,7 +61,7 @@ export default function DoctorProfileAccount() {
     bio: 'Dokter berdedikasi tinggi dalam melayani pasien dengan sepenuh hati sesuai standar medis yang berlaku.'
   };
 
-  // Data Medis Statis (Belum ada tabelnya di Backend)
+  // Data Medis Statis 
   const [medicalInfo] = useState({
     education: [
       {
