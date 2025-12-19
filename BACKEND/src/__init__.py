@@ -56,11 +56,11 @@ def main(global_config, **settings):
         # ==========================================
         # 2. Routing APPOINTMENTS
         # ==========================================
-        config.add_route('create-appointment', '/api/appointments/create-appointment')
-        config.add_route('edit-appointment', '/api/appointments/edit-appointment')
-        config.add_route('delete-appointment', '/api/appointments/delete-appointment')
-        config.add_route('show-appointments', '/api/appointments/show-appointments')
-        config.add_route('filter-appointments', '/api/appointments/filter-appointments')
+        config.add_route('create-appointment', '/api/appointments/create')
+        config.add_route('edit-appointment', '/api/appointments/edit')
+        config.add_route('delete-appointment', '/api/appointments/delete')
+        config.add_route('show-appointments', '/api/appointments/show')
+        config.add_route('filter-appointments', '/api/appointments/filter')
         
         # ==========================================
         # 3. Routing ACCOUNTS (Profil & Setting)
