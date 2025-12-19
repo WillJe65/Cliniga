@@ -4,19 +4,37 @@ from .models import DBSession, Base
 from dotenv import load_dotenv
 from pyramid.events import NewRequest
 import os
+from pyramid.response import Response
 
-# --- [MULAI KODE CORS MANUAL] ---
+# --- [1. FUNGSI CORS MANUAL] ---
 def add_cors_headers_response_callback(event):
     def cors_headers(request, response):
+        # Daftar Domain yang Diizinkan
+        allowed_origins = [
+            'https://cliniga.web.id',
+            'https://www.cliniga.web.id',
+            'http://localhost:5173',  # Untuk dev local
+        ]
+        
+        origin = request.headers.get('Origin')
+
+        # Header Dasar
         response.headers.update({
-        'Access-Control-Allow-Origin': '*',  # Izinkan React mengakses
-        'Access-Control-Allow-Methods': 'POST,GET,DELETE,PUT,OPTIONS',
-        'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Max-Age': '1728000',
+            'Access-Control-Allow-Methods': 'POST,GET,DELETE,PUT,OPTIONS',
+            'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '1728000',
         })
+
+        # Cek Whitelist
+        if origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+
     event.request.add_response_callback(cors_headers)
-# --- [AKHIR KODE CORS MANUAL] ---
+
+# --- [2. VIEW OPTIONS (PREFLIGHT)] ---
+def options_view(request):
+    return Response(status=200)
 
 
 def main(global_config, **settings):
@@ -42,8 +60,13 @@ def main(global_config, **settings):
 
     # Setup Pyramid
     with Configurator(settings=settings) as config:
-        # Tambahkan CORS headers ke setiap response
+       # --- SETUP CORS ---
         config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+        
+        # --- ROUTE KHUSUS OPTIONS (PREFLIGHT) ---
+        # Pastikan dua baris ini ada dan urutannya seperti ini:
+        config.add_route('cors-options', '/api/*path', request_method='OPTIONS')
+        config.add_view(options_view, route_name='cors-options')
         
         config.include('pyramid_tm')
         

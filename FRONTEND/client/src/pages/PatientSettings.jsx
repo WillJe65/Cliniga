@@ -34,7 +34,7 @@ const PatientSettings = () => {
   const changePasswordMutation = useMutation({
     mutationFn: async (data) => {
       // Pastikan endpoint ini ada di backend (misal: auth.py)
-      const response = await fetch("/api/auth/change-password", {
+      const response = await fetch("/api/account/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -53,7 +53,7 @@ export default function DoctorProfileAccount() {
     specialization: currentDoctor?.specialization || 'Umum', // Dari API
     schedule: currentDoctor?.schedule || 'Senin - Jumat', // Dari API
     
-    // --- Data di bawah ini belum ada di Backend, jadi kita Hardcode dulu ---
+    
     phone: '+62 812 3456 7890', 
     licenseNumber: 'STR-12345/2025',
     hospital: 'Klinik Utama Cliniga',
