@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.local/
+.replit
+package-lock.json
+.env
+.env.local
+.env.*.local
+*.log
+.vscode/settings.json
+.idea/
