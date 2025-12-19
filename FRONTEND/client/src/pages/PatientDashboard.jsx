@@ -1,11 +1,37 @@
 import React from 'react';
-import { Calendar, PlusCircle, FileText, User, ChevronRight, Clock, AlertCircle } from 'lucide-react';
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Calendar, PlusCircle, FileText, User, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import PatientSidebar from '@/components/layout/PatientSidebar';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
+
+  // 1. FETCH APPOINTMENTS UNTUK STATISTIK
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: [`/api/appointments/filter?patient_id=${user?.id}`],
+    enabled: !!user?.id, // Hanya jalan jika user sudah login
+  });
+
+  const appointments = responseData?.appointments || [];
+
+  // 2. HITUNG STATISTIK
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  // Janji Mendatang: Tanggal >= Hari ini, dan status bukan batal/selesai
+  const upcomingCount = appointments.filter(apt => 
+    (apt.appointment_date >= todayStr) && 
+    apt.status !== 'cancelled' && 
+    apt.status !== 'completed'
+  ).length;
+
+  // Riwayat Kesehatan: Status 'completed' (dianggap sudah ada rekam medis)
+  const historyCount = appointments.filter(apt => apt.status === 'completed').length;
+
+  // Dokter Pilihan: Jumlah dokter unik yang pernah berinteraksi dengan pasien ini
+  const uniqueDoctorsCount = new Set(appointments.map(apt => apt.doctor_id)).size;
 
   const menus = [
     { 
@@ -78,7 +104,9 @@ const PatientDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm">Janji Temu Mendatang</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">2</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-2">
+                    {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : upcomingCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
                   <Calendar size={24} />
@@ -90,7 +118,9 @@ const PatientDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm">Riwayat Kesehatan</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">5</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-2">
+                    {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : historyCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center">
                   <FileText size={24} />
@@ -101,8 +131,10 @@ const PatientDashboard = () => {
             <div className="bg-white rounded-2xl p-6 border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-500 text-sm">Dokter Pilihan</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">3</p>
+                  <p className="text-gray-500 text-sm">Dokter Dikunjungi</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-2">
+                    {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : uniqueDoctorsCount}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-full flex items-center justify-center">
                   <User size={24} />

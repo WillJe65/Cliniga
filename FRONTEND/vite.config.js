@@ -36,6 +36,16 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: "0.0.0.0",
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:6543', // Port standar Pyramid (pserve)
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+    // -------------------------------------------
     fs: {
       strict: true,
       deny: ["**/.*"],

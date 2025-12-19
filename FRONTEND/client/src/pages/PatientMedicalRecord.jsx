@@ -1,44 +1,40 @@
 import React, { useState } from 'react';
-import { FileText, Download, Eye, ArrowLeft, Lock } from 'lucide-react';
+import { useQuery } from "@tanstack/react-query";
+import { FileText, Download, Eye, ArrowLeft, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'wouter';
+import { useAuth } from '@/context/AuthContext';
 import PatientSidebar from '@/components/layout/PatientSidebar';
+import { format, parseISO } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
 
 const PatientMedicalRecord = () => {
+  const { user } = useAuth();
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const records = [
-    {
-      id: 1,
-      doctor: "Dr. Sarah Smith",
-      specialty: "Cardiology",
-      date: "15 Dec 2025",
-      diagnosis: "Tekanan darah tinggi",
-      treatment: "Resep obat hipertensi",
-      notes: "Pasien disarankan untuk mengurangi asupan garam dan melakukan olahraga teratur.",
-      medicines: ["Lisinopril 10mg", "Amlodipine 5mg"]
-    },
-    {
-      id: 2,
-      doctor: "Dr. Michael Johnson",
-      specialty: "Dermatology",
-      date: "10 Dec 2025",
-      diagnosis: "Dermatitis kontak",
-      treatment: "Salep kortikosteroid topical",
-      notes: "Hindari kontak dengan alergen. Gunakan salep 2x sehari selama 2 minggu.",
-      medicines: ["Triamcinolone Acetonide 0.1% Cream"]
-    },
-    {
-      id: 3,
-      doctor: "Dr. Sarah Smith",
-      specialty: "Cardiology",
-      date: "05 Dec 2025",
-      diagnosis: "Check-up rutin",
-      treatment: "Lanjutkan gaya hidup sehat",
-      notes: "Hasil pemeriksaan normal. Lanjutkan gaya hidup sehat dan kontrol berkala.",
-      medicines: []
-    }
-  ];
+  // 1. FETCH DATA REKAM MEDIS (Dari Appointment yang sudah SELESAI)
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: [`/api/appointments/filter?patient_id=${user?.id}&status=completed`],
+    enabled: !!user?.id,
+  });
+
+  // Ambil list appointment dari response
+  const rawAppointments = responseData?.appointments || [];
+
+  // 2. MAPPING DATA API KE FORMAT UI
+  const records = rawAppointments.map((apt) => ({
+    id: apt.id,
+    doctor: apt.doctor_name || "Dokter", // Pastikan backend mengirim doctor_name
+    specialty: apt.doctor_specialization || "Umum", // Pastikan backend mengirim ini
+    date: apt.appointment_date 
+      ? format(parseISO(apt.appointment_date), "d MMM yyyy", { locale: idLocale }) 
+      : "-",
+    // Field di bawah ini tergantung apakah backend appointment menyertakan data medis (join)
+    diagnosis: apt.diagnosis || "Data diagnosa belum tersedia",
+    treatment: apt.treatment || "Lihat detail catatan dokter",
+    notes: apt.notes || "-",
+    medicines: apt.medicines || [] // Backend perlu mengirim array obat jika ada
+  }));
 
   const handleViewDetail = (record) => {
     setSelectedRecord(record);
@@ -46,8 +42,8 @@ const PatientMedicalRecord = () => {
   };
 
   const handleDownload = (record) => {
+    // Simulasi download
     alert(`Mengunduh rekam medis dari ${record.doctor}...`);
-    // TODO: Implement actual download functionality
   };
 
   return (
@@ -74,11 +70,18 @@ const PatientMedicalRecord = () => {
             </div>
           </div>
 
-          {records.length === 0 ? (
+          {/* CONTENT: LOADING / EMPTY / LIST */}
+          {isLoading ? (
+             <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                <div className="flex justify-center items-center gap-2 text-gray-500">
+                  <Loader2 className="animate-spin" /> Memuat riwayat medis...
+                </div>
+             </div>
+          ) : records.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 border border-gray-100 text-center">
               <FileText size={48} className="mx-auto text-gray-300 mb-4" />
               <h3 className="text-lg font-bold text-gray-900">Tidak ada rekam medis</h3>
-              <p className="text-gray-600 mt-2">Rekam medis akan muncul setelah Anda melakukan konsultasi dengan dokter</p>
+              <p className="text-gray-600 mt-2">Rekam medis akan muncul setelah status janji temu "Selesai".</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -97,18 +100,14 @@ const PatientMedicalRecord = () => {
                           <p className="text-xs text-gray-400 mt-2">{record.date}</p>
                         </div>
                         <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
-                          Terverifikasi
+                          Selesai
                         </span>
                       </div>
 
                       <div className="mt-4 space-y-2">
                         <div>
                           <p className="text-xs font-semibold text-gray-600 uppercase">Diagnosa:</p>
-                          <p className="text-sm text-gray-700">{record.diagnosis}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-600 uppercase">Tindakan/Resep:</p>
-                          <p className="text-sm text-gray-700">{record.treatment}</p>
+                          <p className="text-sm text-gray-700 line-clamp-1">{record.diagnosis}</p>
                         </div>
                       </div>
 
@@ -137,17 +136,22 @@ const PatientMedicalRecord = () => {
 
           {/* Information Box */}
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
-            <h3 className="font-bold text-blue-900 mb-2">💡 Informasi Penting</h3>
-            <p className="text-sm text-blue-800">
-              Catatan medis ini bersifat <strong>read-only</strong> (hanya dapat dibaca). Hanya dokter yang berwenang yang dapat menambahkan atau mengubah informasi medis. Jika Anda menemukan kesalahan dalam data, silakan hubungi dokter yang bersangkutan.
-            </p>
+            <div className="flex gap-3">
+              <AlertCircle className="text-blue-600 flex-shrink-0" size={20} />
+              <div>
+                <h3 className="font-bold text-blue-900 mb-1">Informasi Penting</h3>
+                <p className="text-sm text-blue-800">
+                  Catatan medis ini bersifat <strong>read-only</strong>. Jika Anda menemukan kesalahan dalam data, silakan hubungi dokter yang bersangkutan atau admin klinik.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Detail Modal */}
       {showDetailModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-start justify-between mb-6 pb-4 border-b border-gray-200">
@@ -179,16 +183,18 @@ const PatientMedicalRecord = () => {
                 </div>
               </div>
 
-              {/* Treatment */}
+              {/* Treatment / Notes */}
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Tindakan/Resep</p>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-gray-900">{selectedRecord.treatment}</p>
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Catatan / Penanganan</p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-gray-900">{selectedRecord.notes}</p>
+                  <hr className="my-2 border-yellow-200"/>
+                  <p className="text-gray-900 text-sm">{selectedRecord.treatment}</p>
                 </div>
               </div>
 
-              {/* Medicines */}
-              {selectedRecord.medicines.length > 0 && (
+              {/* Medicines (Jika ada) */}
+              {selectedRecord.medicines && selectedRecord.medicines.length > 0 && (
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Obat-obatan</p>
                   <div className="space-y-2">
@@ -201,14 +207,6 @@ const PatientMedicalRecord = () => {
                   </div>
                 </div>
               )}
-
-              {/* Notes */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Catatan Dokter</p>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-gray-900">{selectedRecord.notes}</p>
-                </div>
-              </div>
 
               {/* Read-Only Notice */}
               <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 text-center">

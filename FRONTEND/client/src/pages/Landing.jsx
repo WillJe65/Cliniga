@@ -53,11 +53,26 @@ const howItWorks = [
 ];
 
 export default function Landing() {
-  const { data: doctors = [] } = useQuery({
+  // 1. FETCH DATA DARI API
+  const { data: apiDoctors = [] } = useQuery({
     queryKey: ["/api/doctors"],
   });
 
+  // 2. DATA MAPPING (PENTING!)
+  // Karena backend belum mengirim image/rating, kita beri default agar UI Landing Page tetap cantik.
+  const doctors = apiDoctors.map(doc => ({
+    ...doc,
+    // Gunakan gambar random dari Unsplash jika backend tidak ada gambar
+    image: doc.image || "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop", 
+    rating: doc.rating || 4.8, 
+    reviewCount: doc.reviewCount || 120,
+    location: doc.location || "Jakarta Pusat",
+    hospital: doc.hospital || "RS Cliniga Utama"
+  }));
+
+  // Ambil 3 dokter pertama untuk Featured Section
   const featuredDoctors = doctors.slice(0, 3);
+  
   const [scrollY, setScrollY] = useState(0);
 
   // Track scroll position untuk parallax effect
@@ -140,7 +155,7 @@ export default function Landing() {
                   className="gap-2 w-full sm:w-auto text-sm sm:text-base transition-all duration-300 hover:shadow-lg hover:scale-105"
                   data-testid="button-get-started"
                 >
-                  Masuk
+                  Masuk / Daftar
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

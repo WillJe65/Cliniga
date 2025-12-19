@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Lock, Bell, Eye, EyeOff } from 'lucide-react';
+import { useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Lock, Bell, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 import PatientSidebar from '@/components/layout/PatientSidebar';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from "@/hooks/use-toast";
 
 const PatientSettings = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -17,7 +21,6 @@ const PatientSettings = () => {
     new: false,
     confirm: false
   });
-  const [message, setMessage] = useState(null);
 
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
@@ -27,30 +30,73 @@ const PatientSettings = () => {
     }));
   };
 
+  // MUTATION: GANTI PASSWORD
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data) => {
+      // Pastikan endpoint ini ada di backend (misal: auth.py)
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user?.email, // Menggunakan email sebagai identifier
+          current_password: data.currentPassword,
+          new_password: data.newPassword
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal mengubah kata sandi");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Berhasil",
+        description: "Kata sandi Anda telah diperbarui.",
+      });
+      // Reset Form & Tutup
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setShowChangePassword(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Gagal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSubmitPassword = (e) => {
     e.preventDefault();
     
+    // Validasi Client-Side
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage({ type: 'error', text: 'Password baru tidak cocok!' });
+      toast({
+        title: "Validasi Gagal",
+        description: "Konfirmasi kata sandi baru tidak cocok.",
+        variant: "destructive"
+      });
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password harus minimal 6 karakter!' });
+      toast({
+        title: "Validasi Gagal",
+        description: "Kata sandi harus minimal 6 karakter.",
+        variant: "destructive"
+      });
       return;
     }
 
-    // TODO: Send to backend
-    setMessage({ type: 'success', text: 'Password berhasil diubah!' });
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    setTimeout(() => {
-      setShowChangePassword(false);
-      setMessage(null);
-    }, 2000);
+    // Kirim ke Backend
+    changePasswordMutation.mutate(passwordData);
   };
 
   const togglePasswordVisibility = (field) => {
@@ -79,7 +125,7 @@ const PatientSettings = () => {
 
           {/* Settings Cards */}
           <div className="space-y-6">
-            {/* Notification Settings */}
+            {/* Notification Settings (Mock UI - Belum ada endpoint spesifik) */}
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -96,15 +142,15 @@ const PatientSettings = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <label className="text-sm font-semibold text-gray-700">Pemberitahuan Email</label>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer" />
+                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer accent-blue-600" />
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <label className="text-sm font-semibold text-gray-700">Pemberitahuan Janji Temu</label>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer" />
+                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer accent-blue-600" />
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <label className="text-sm font-semibold text-gray-700">Pemberitahuan Hasil Medis</label>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer" />
+                  <input type="checkbox" defaultChecked className="w-4 h-4 cursor-pointer accent-blue-600" />
                 </div>
               </div>
             </div>
@@ -132,16 +178,6 @@ const PatientSettings = () => {
               {/* Change Password Form */}
               {showChangePassword && (
                 <form onSubmit={handleSubmitPassword} className="mt-6 pt-6 border-t border-gray-200">
-                  {message && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm font-semibold ${
-                      message.type === 'success' 
-                        ? 'bg-green-50 text-green-700 border border-green-200'
-                        : 'bg-red-50 text-red-700 border border-red-200'
-                    }`}>
-                      {message.text}
-                    </div>
-                  )}
-
                   <div className="space-y-4">
                     {/* Current Password */}
                     <div>
@@ -221,26 +257,34 @@ const PatientSettings = () => {
                     {/* Submit Button */}
                     <button
                       type="submit"
-                      className="w-full mt-6 px-4 py-3 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition"
+                      disabled={changePasswordMutation.isPending}
+                      className="w-full mt-6 px-4 py-3 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition flex items-center justify-center gap-2"
                     >
-                      Simpan Kata Sandi Baru
+                      {changePasswordMutation.isPending ? (
+                        <>
+                          <Loader2 className="animate-spin h-5 w-5" />
+                          Memproses...
+                        </>
+                      ) : (
+                        'Simpan Kata Sandi Baru'
+                      )}
                     </button>
                   </div>
                 </form>
               )}
             </div>
 
-            {/* Account Info */}
+            {/* Account Info (Read-Only dari User Context) */}
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h3 className="font-bold text-gray-900 mb-4">Informasi Akun</h3>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Nama</p>
-                  <p className="text-sm text-gray-900 font-semibold">{user?.name}</p>
+                  <p className="text-sm text-gray-900 font-semibold">{user?.name || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Email</p>
-                  <p className="text-sm text-gray-900 font-semibold">{user?.email}</p>
+                  <p className="text-sm text-gray-900 font-semibold">{user?.email || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Peran</p>

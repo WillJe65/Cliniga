@@ -11,34 +11,44 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Filter, X, Stethoscope } from "lucide-react";
 import { useLocation } from "wouter";
 
+// Daftar spesialisasi untuk filter (Sesuaikan dengan data yang mungkin ada di DB)
 const specializations = [
   "Semua",
+  "Umum",
+  "Gigi",
   "Kardiologi",
   "Dermatologi",
   "Pediatri",
   "Ortopedi",
   "Neurologi",
   "Oftalmologi",
-  "Kedokteran Umum",
+  "Penyakit Dalam",
+  "THT"
 ];
 
 export default function Doctors() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSpecialization, setSelectedSpecialization] = useState("All");
+  // Default harus "Semua" agar cocok dengan opsi di atas
+  const [selectedSpecialization, setSelectedSpecialization] = useState("Semua");
   const [showFilters, setShowFilters] = useState(false);
 
+  // 1. FETCH DATA DARI API
   const { data: doctors = [], isLoading } = useQuery({
     queryKey: ["/api/doctors"],
   });
 
+  // 2. LOGIKA FILTER
   const filteredDoctors = doctors.filter((doctor) => {
     const matchesSearch =
       doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doctor.specialization.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Cek apakah user memilih "Semua" atau spesifik
     const matchesSpecialization =
-      selectedSpecialization === "All" ||
+      selectedSpecialization === "Semua" ||
       doctor.specialization === selectedSpecialization;
+      
     return matchesSearch && matchesSpecialization;
   });
 
@@ -81,6 +91,7 @@ export default function Doctors() {
         <section className="py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="lg:grid lg:grid-cols-4 lg:gap-8">
+              {/* Sidebar Filter (Desktop) */}
               <aside className="hidden lg:block">
                 <Card>
                   <CardContent className="p-6">
@@ -105,6 +116,7 @@ export default function Doctors() {
                 </Card>
               </aside>
 
+              {/* Doctor List */}
               <div className="lg:col-span-3">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-2">
@@ -117,11 +129,11 @@ export default function Doctors() {
                       <Filter className="mr-2 h-4 w-4" />
                       Filter
                     </Button>
-                    {selectedSpecialization !== "All" && (
+                    {selectedSpecialization !== "Semua" && (
                       <Badge variant="secondary" className="gap-1">
                         {selectedSpecialization}
                         <button
-                          onClick={() => setSelectedSpecialization("All")}
+                          onClick={() => setSelectedSpecialization("Semua")}
                           className="ml-1 hover:text-destructive"
                         >
                           <X className="h-3 w-3" />
@@ -134,6 +146,7 @@ export default function Doctors() {
                   </p>
                 </div>
 
+                {/* Mobile Filters */}
                 {showFilters && (
                   <Card className="mb-6 lg:hidden">
                     <CardContent className="p-4">
@@ -180,19 +193,19 @@ export default function Doctors() {
                       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                         <Stethoscope className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <h3 className="mt-4 text-lg font-semibold">No doctors found</h3>
+                      <h3 className="mt-4 text-lg font-semibold">Tidak ada dokter ditemukan</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Try adjusting your search or filter criteria
+                        Coba sesuaikan kata kunci pencarian atau filter spesialisasi Anda.
                       </p>
                       <Button
                         variant="outline"
                         className="mt-4"
                         onClick={() => {
                           setSearchQuery("");
-                          setSelectedSpecialization("All");
+                          setSelectedSpecialization("Semua");
                         }}
                       >
-                        Clear filters
+                        Hapus Filter
                       </Button>
                     </CardContent>
                   </Card>
